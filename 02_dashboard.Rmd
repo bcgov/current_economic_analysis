@@ -1,10 +1,11 @@
 ---
 title: "Current Economic Outlook"
 output:
-  flexdashboard::flex_dashboard: null
-  orientation: columns
-css: style.css
-source_code: embed
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    social: menu
+    source_code: embed
+    css: style.css
 runtime: shiny
 resource_files:
 - processed_data/mpi.rds
@@ -48,7 +49,27 @@ extract_cell <- function(df, nm){
   df<- df[[1]]
   return(df)
 }
+plotly_ts <- function(df, thing, format_as, tt_text){
+  plt <-  ggplot(df, aes(Month, 
+                          {{  thing  }}, 
+                          colour = Series,
+                          group = Series,
+                          text = paste(
+                            "\nIn", Month, tt_text, "\n", Series,   
+                            "was", format_as({{ thing  }}, accuracy = .1))))+
+            geom_line()+
+            scale_colour_manual(values=cbPalette)+
+            scale_y_continuous(label=format_as)+
+            theme_minimal()
+  ggplotly(plt, tooltip="text")%>%
+    layout(annotations = list(text = paste("Source: ",df$Source[1]),
+                              font = list(size = 10),
+                              showarrow = FALSE,
+                              xref = 'paper', x = 1,
+                              yref = 'paper', y = -0.06))
+}
 ```
+
 
 Not the MPI:
 =====================================  
@@ -57,8 +78,14 @@ Not the MPI:
 -------------------------------------
 
 ```{r}
-selectInput("name", label = "Choose a data set:",
-            choices = nested_dataframe$name, selected = nested_dataframe$name[1])
+selectInput("name", 
+            label = "Choose a data set:",
+            choices = nested_dataframe$name, 
+            selected = nested_dataframe$name[1])
+
+reactive_df <- reactive({
+  extract_cell(nested_dataframe, input$name)
+})
 ```
 
 Column {.tabset}
@@ -67,79 +94,31 @@ Column {.tabset}
 ### Levels:
 
 ```{r}
-renderPlotly({
-  df <- extract_cell(nested_dataframe, input$name)
-  plt <-   ggplot(df, aes(Month, 
-                          Value,
-                          group = Series,
-                          colour = Series,
-                          text = paste(
-                                      "\nIn", Month, "the value for \n", Series,   
-                                      "was", comma(Value, accuracy = .01))))+
-    geom_line()+
-    scale_colour_manual(values=cbPalette)+
-    scale_y_continuous(trans="log10", label=comma)+
-    theme_minimal()+
-    labs(title= input$name)
-  ggplotly(plt, tooltip="text")%>%
-    layout(annotations = list(text = paste("Source: ",df$Source[1]),
-                              font = list(size = 10),
-                              showarrow = FALSE,
-                              xref = 'paper', x = 1,
-                              yref = 'paper', y = -0.06))
-})%>%
+renderPlotly({plotly_ts(reactive_df(), 
+                        Value, 
+                        comma,
+                        "the level of "
+                        )})%>%
   bindCache(input$name)
 ```
 
 ### Monthly Changes:
 
 ```{r}
-renderPlotly({
-  df <- extract_cell(nested_dataframe, input$name)
-  plt <-   ggplot(df, aes(Month, 
-                          `Monthly Change`, 
-                          colour = Series,
-                          group = Series,
-                          text = paste(
-                                      "\nIn", Month, "the monthly rate of change for \n", Series,   
-                                      "was", percent(`Monthly Change`, accuracy = .1))))+
-    geom_line()+
-    scale_colour_manual(values=cbPalette)+
-    scale_y_continuous(label=percent)+
-    theme_minimal()
-  ggplotly(plt, tooltip="text")%>%
-    layout(annotations = list(text = paste("Source: ",df$Source[1]),
-                              font = list(size = 10),
-                              showarrow = FALSE,
-                              xref = 'paper', x = 1,
-                              yref = 'paper', y = -0.06))
-})%>%
+renderPlotly({plotly_ts(reactive_df(),
+                        `Monthly Change`, 
+                        percent,
+                        "the monthly rate of change of ")})%>%
   bindCache(input$name)
 ```
 
 ### Annual Changes:
 
 ```{r}
-renderPlotly({
-  df <- extract_cell(nested_dataframe, input$name)
-  plt <-   ggplot(df, aes(Month, 
-                          `Annual Change`, 
-                          colour = Series,
-                          group = Series,
-                          text = paste(
-                                      "\nIn", Month, "the annual rate of change for \n", Series,   
-                                      "was", percent(`Annual Change`, accuracy = .1))))+
-    geom_line()+
-    scale_colour_manual(values=cbPalette)+
-    scale_y_continuous(label=percent)+
-    theme_minimal()
-  ggplotly(plt, tooltip="text")%>%
-    layout(annotations = list(text = paste("Source: ",df$Source[1]),
-                              font = list(size = 10),
-                              showarrow = FALSE,
-                              xref = 'paper', x = 1,
-                              yref = 'paper', y = -0.06))
-})%>%
+renderPlotly({plotly_ts(reactive_df(), 
+                        `Annual Change`, 
+                        percent,
+                        "the annual rate of change of ")})%>%
   bindCache(input$name)
 ```
 
@@ -147,7 +126,7 @@ renderPlotly({
   
 ```{r}
 DT::renderDataTable(server=FALSE,{
-  extract_cell(nested_dataframe, input$name)%>%
+  reactive_df()%>%
     select(-Source)%>%
     mutate(Month=as.character(Month))%>%
     datatable(extensions = "Buttons", 
@@ -165,7 +144,7 @@ DT::renderDataTable(server=FALSE,{
                              ),
                              pageLength=10, 
                              lengthMenu=c(3,5)))
-})%>%
+  })%>%
   bindCache(input$name)
 ```
 
@@ -188,14 +167,6 @@ selectInput("y_var", label = "Choose a variable for y axis:",
 selectInput("facet_var", label = "Choose a variable to facet by:",
             choices = possible_vars, selected = "project_status")
 
-```
-
-Column {.tabset}
------------------------------------------------------------------------
-
-### Plot:
-
-```{r}
 observe({
   updateSelectInput(session, "y_var", choices= possible_vars[possible_vars!=input$x_var])
 })
@@ -212,10 +183,17 @@ mpi_group_summary <- reactive({
   summarize(`Total Cost (M)`=sum(estimated_cost, na.rm=TRUE))%>%
   filter(`Total Cost (M)`>0)
 })
+```
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+### Plot:
+
+```{r}
 
 renderPlot({
-
-plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`, 
+  plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`, 
                                       `Y-axis variable`, 
                                       fill=`Total Cost (M)`,
                                       text = paste("total project cost is", comma(`Total Cost (M)`), "Million.")))+
@@ -227,7 +205,7 @@ plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`,
   labs(x=input$x_var,
        y=input$y_var)
 
-aest_fix_labs(plt)  
+  aest_fix_labs(plt)  
 })%>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
@@ -246,13 +224,11 @@ DT::renderDataTable(server=FALSE, {mpi_group_summary()%>%
                              ordering = TRUE,
                              dom = 'Btip',
                              buttons = list(
-                                list(extend = 'csv', filename =  input$name),
-                                list(extend = 'excel', filename = input$name)
+                                list(extend = 'csv', filename =  "MPI"),
+                                list(extend = 'excel', filename = "MPI")
                              ),
                              pageLength=10, 
                              lengthMenu=c(3,5)))
 })%>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
-
-
 ```
