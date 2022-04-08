@@ -1,0 +1,258 @@
+---
+title: "Current Economic Outlook"
+output:
+  flexdashboard::flex_dashboard: null
+  orientation: columns
+css: style.css
+source_code: embed
+runtime: shiny
+resource_files:
+- processed_data/mpi.rds
+- processed_data/nested_dataframe.rds
+---
+  
+```{r global, include=FALSE}
+# Copyright 2022 Province of British Columbia
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and limitations under the License.
+#libraries----------
+library(DT)
+library(tidyverse)
+library(here)
+library(scales)
+library(tsibble)
+library(plotly)
+library(lubridate)
+library(ggsflabel)
+library(aest)
+#load objects----------
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+nested_dataframe <- readRDS(here("processed_data", "nested_dataframe.rds"))
+mpi <- readRDS(here("processed_data", "mpi.rds"))%>%
+  filter(last_update>today()-years(5)) # a single project had a last_update value of 2016?
+#functions------------
+#Extractor function (retrieve cell)---------- 
+extract_cell <- function(df, nm){
+  df <- df%>%
+    filter(name==nm)%>%
+    select(value)%>%
+    pull()
+  df<- df[[1]]
+  return(df)
+}
+```
+
+Not the MPI:
+=====================================  
+ 
+ Inputs {.sidebar}
+-------------------------------------
+
+```{r}
+selectInput("name", label = "Choose a data set:",
+            choices = nested_dataframe$name, selected = nested_dataframe$name[1])
+```
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+### Levels:
+
+```{r}
+renderPlotly({
+  df <- extract_cell(nested_dataframe, input$name)
+  plt <-   ggplot(df, aes(Month, 
+                          Value,
+                          group = Series,
+                          colour = Series,
+                          text = paste(
+                                      "\nIn", Month, "the value for \n", Series,   
+                                      "was", comma(Value, accuracy = .01))))+
+    geom_line()+
+    scale_colour_manual(values=cbPalette)+
+    scale_y_continuous(trans="log10", label=comma)+
+    theme_minimal()+
+    labs(title= input$name)
+  ggplotly(plt, tooltip="text")%>%
+    layout(annotations = list(text = paste("Source: ",df$Source[1]),
+                              font = list(size = 10),
+                              showarrow = FALSE,
+                              xref = 'paper', x = 1,
+                              yref = 'paper', y = -0.06))
+})%>%
+  bindCache(input$name)
+```
+
+### Monthly Changes:
+
+```{r}
+renderPlotly({
+  df <- extract_cell(nested_dataframe, input$name)
+  plt <-   ggplot(df, aes(Month, 
+                          `Monthly Change`, 
+                          colour = Series,
+                          group = Series,
+                          text = paste(
+                                      "\nIn", Month, "the monthly rate of change for \n", Series,   
+                                      "was", percent(`Monthly Change`, accuracy = .1))))+
+    geom_line()+
+    scale_colour_manual(values=cbPalette)+
+    scale_y_continuous(label=percent)+
+    theme_minimal()
+  ggplotly(plt, tooltip="text")%>%
+    layout(annotations = list(text = paste("Source: ",df$Source[1]),
+                              font = list(size = 10),
+                              showarrow = FALSE,
+                              xref = 'paper', x = 1,
+                              yref = 'paper', y = -0.06))
+})%>%
+  bindCache(input$name)
+```
+
+### Annual Changes:
+
+```{r}
+renderPlotly({
+  df <- extract_cell(nested_dataframe, input$name)
+  plt <-   ggplot(df, aes(Month, 
+                          `Annual Change`, 
+                          colour = Series,
+                          group = Series,
+                          text = paste(
+                                      "\nIn", Month, "the annual rate of change for \n", Series,   
+                                      "was", percent(`Annual Change`, accuracy = .1))))+
+    geom_line()+
+    scale_colour_manual(values=cbPalette)+
+    scale_y_continuous(label=percent)+
+    theme_minimal()
+  ggplotly(plt, tooltip="text")%>%
+    layout(annotations = list(text = paste("Source: ",df$Source[1]),
+                              font = list(size = 10),
+                              showarrow = FALSE,
+                              xref = 'paper', x = 1,
+                              yref = 'paper', y = -0.06))
+})%>%
+  bindCache(input$name)
+```
+
+### The Data:
+  
+```{r}
+DT::renderDataTable(server=FALSE,{
+  extract_cell(nested_dataframe, input$name)%>%
+    select(-Source)%>%
+    mutate(Month=as.character(Month))%>%
+    datatable(extensions = "Buttons", 
+              options = list(rownames = FALSE, 
+                             columnDefs = list(list(className = 'dt-center', targets = "_all")),
+                             paging = TRUE,
+                             scrollX=TRUE,
+                             scrollY=TRUE,
+                             searching = TRUE,
+                             ordering = TRUE,
+                             dom = 'Btip',
+                             buttons = list(
+                                list(extend = 'csv', filename =  input$name),
+                                list(extend = 'excel', filename = input$name)
+                             ),
+                             pageLength=10, 
+                             lengthMenu=c(3,5)))
+})%>%
+  bindCache(input$name)
+```
+
+MPI: 
+=====================================     
+
+Inputs {.sidebar}
+-------------------------------------
+
+```{r}
+char_cols <- colnames(mpi)[sapply(mpi,class)=="character"]
+possible_vars <- char_cols[char_cols!="source"]
+
+selectInput("filter_var", label = "Choose a quarter:",
+            choices = unique(mpi$last_update), selected = tail(unique(mpi$last_update)))
+selectInput("x_var", label = "Choose a variable for x axis:",
+            choices = possible_vars, selected = "region")
+selectInput("y_var", label = "Choose a variable for y axis:",
+            choices = possible_vars, selected = "project_stage")
+selectInput("facet_var", label = "Choose a variable to facet by:",
+            choices = possible_vars, selected = "project_status")
+
+```
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+### Plot:
+
+```{r}
+observe({
+  updateSelectInput(session, "y_var", choices= possible_vars[possible_vars!=input$x_var])
+})
+observe({
+  updateSelectInput(session, "facet_var", choices= possible_vars[possible_vars!=input$x_var & possible_vars!=input$y_var])
+})
+
+mpi_group_summary <- reactive({
+  mpi%>%
+  filter(as.character(last_update) == as.character(input$filter_var))%>%
+  group_by_(`X-axis variable`=input$x_var, #group_by_ DEPRECATED.
+            `Y-axis variable`=input$y_var,
+            `Facet variable`=input$facet_var)%>%
+  summarize(`Total Cost (M)`=sum(estimated_cost, na.rm=TRUE))%>%
+  filter(`Total Cost (M)`>0)
+})
+
+renderPlot({
+
+plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`, 
+                                      `Y-axis variable`, 
+                                      fill=`Total Cost (M)`,
+                                      text = paste("total project cost is", comma(`Total Cost (M)`), "Million.")))+
+  geom_tile()+
+  scale_fill_viridis_c(trans="log10", labels=comma)+
+  facet_wrap(~`Facet variable`)+
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))+
+  labs(x=input$x_var,
+       y=input$y_var)
+
+aest_fix_labs(plt)  
+})%>%
+  bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
+```
+
+### Table:
+  
+```{r}
+DT::renderDataTable(server=FALSE, {mpi_group_summary()%>%
+    datatable(extensions = "Buttons", 
+              options = list(rownames = FALSE, 
+                             columnDefs = list(list(className = 'dt-center', targets = "_all")),
+                             paging = TRUE,
+                             scrollX=TRUE,
+                             scrollY=TRUE,
+                             searching = TRUE,
+                             ordering = TRUE,
+                             dom = 'Btip',
+                             buttons = list(
+                                list(extend = 'csv', filename =  input$name),
+                                list(extend = 'excel', filename = input$name)
+                             ),
+                             pageLength=10, 
+                             lengthMenu=c(3,5)))
+})%>%
+  bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
+
+
+```
