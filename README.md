@@ -10,22 +10,10 @@ current_economic_analysis
 
 ### Usage
 
-Describe data being used (links), and how to run. Eg:
+Rscript run_all.R
 
-There are four core scripts that are required for the analysis, they need to be run in order:
-
--   01\_clean.R
--   02\_analysis.R
--   03\_visualize.R
--   04\_output.R
-
-#### Example
-
-This is a basic example which shows you how to solve a common problem:
-
-``` r
-## basic example code
-```
+1) parses and evaluates file 01_load.R: this ensures that errors in reading the files does not halt execution.
+2) deploys the app 02_dashboard.Rmd to shinyapps.io.
 
 ### Project Status
 
