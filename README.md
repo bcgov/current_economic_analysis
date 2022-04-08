@@ -10,10 +10,11 @@ current_economic_analysis
 
 ### Usage
 
-Rscript run_all.R
+1) create sub directories raw_data and processed_data.
 
-1) parses and evaluates file 01_load.R: this ensures that errors in reading the files does not halt execution.
-2) deploys the app 02_dashboard.Rmd to shinyapps.io.
+2a) To deploy app to shinyapps.io, type Rscript run_all.R (in shell/ at command line) and hit enter OR
+
+2b) Within Rstudio open file 01_load.R and hit the source button. Then open 02_dashboard.Rmd and hit the run document button.
 
 ### Project Status
 
