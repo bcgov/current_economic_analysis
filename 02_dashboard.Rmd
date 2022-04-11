@@ -4,12 +4,13 @@ output:
   flexdashboard::flex_dashboard:
     orientation: columns
     social: menu
-    source_code: "https://github.com/bcgov/current_economic_analysis"
+    source_code: https://github.com/bcgov/current_economic_analysis
     css: style.css
 runtime: shiny
 resource_files:
 - processed_data/mpi.rds
 - processed_data/nested_dataframe.rds
+- R/functions.R
 ---
   
 ```{r global, include=FALSE}
@@ -51,7 +52,7 @@ plotly_ts <- function(df, thing, format_as, tt_text){
                           group = Series,
                           text = paste(
                             "\nIn", Month, tt_text, "\n", Series,   
-                            "was", format_as({{ thing  }}, accuracy = .1))))+
+                            "was", format_as({{ thing  }}, accuracy = .01))))+
             geom_line()+
             scale_colour_manual(values=cbPalette)+
             scale_y_continuous(label=format_as)+
@@ -66,11 +67,17 @@ plotly_ts <- function(df, thing, format_as, tt_text){
 ```
 
 
-Not the MPI:
+Time Series:
 =====================================  
  
  Inputs {.sidebar}
 -------------------------------------
+
+- This dashboard allows you to visualize and download the data for `r dim(nested_dataframe)[1]` time series pertinent to British Columbia's current economic outlook. 
+- This dashboard also contains recent information on the [Major Project Inventory](https://richard-martin.shinyapps.io/Major_Project_Inventory/).
+
+
+
 
 ```{r}
 selectInput("name", 
@@ -123,7 +130,9 @@ plotly::renderPlotly({plotly_ts(reactive_df(),
 DT::renderDataTable(server=FALSE,{
   reactive_df()%>%
     select(-Source)%>%
-    mutate(Month=as.character(Month))%>%
+    mutate(Month=as.character(Month),
+           `Monthly Change` = scales::percent(`Monthly Change`, accuracy=.1),
+           `Annual Change` = scales::percent(`Annual Change`, accuracy=.1))%>%
     DT::datatable(extensions = "Buttons", 
               options = list(rownames = FALSE, 
                              columnDefs = list(list(className = 'dt-center', targets = "_all")),
@@ -143,7 +152,7 @@ DT::renderDataTable(server=FALSE,{
   bindCache(input$name)
 ```
 
-MPI: 
+Major Project Inventory: 
 =====================================     
 
 Inputs {.sidebar}
