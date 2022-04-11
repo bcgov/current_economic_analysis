@@ -4,7 +4,7 @@ output:
   flexdashboard::flex_dashboard:
     orientation: columns
     social: menu
-    source_code: embed
+    source_code: "https://github.com/bcgov/current_economic_analysis"
     css: style.css
 runtime: shiny
 resource_files:
@@ -25,19 +25,14 @@ resource_files:
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 #libraries----------
-library(DT)
+#library(DT)
 library(tidyverse)
-library(here)
-library(scales)
-library(tsibble)
-library(plotly)
-library(lubridate)
-library(ggsflabel)
-library(aest)
+library(tsibble) #data includes a tsibble::yearquarter field
+library(lubridate) #years and months not exported by lubridate
 #load objects----------
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-nested_dataframe <- readRDS(here("processed_data", "nested_dataframe.rds"))
-mpi <- readRDS(here("processed_data", "mpi.rds"))%>%
+nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds"))
+mpi <- readRDS(here::here("processed_data", "mpi.rds"))%>%
   filter(last_update>today()-years(5)) # a single project had a last_update value of 2016?
 #functions------------
 #Extractor function (retrieve cell)---------- 
@@ -61,8 +56,8 @@ plotly_ts <- function(df, thing, format_as, tt_text){
             scale_colour_manual(values=cbPalette)+
             scale_y_continuous(label=format_as)+
             theme_minimal()
-  ggplotly(plt, tooltip="text")%>%
-    layout(annotations = list(text = paste("Source: ",df$Source[1]),
+  plotly::ggplotly(plt, tooltip="text")%>%
+    plotly::layout(annotations = list(text = paste("Source: ",df$Source[1]),
                               font = list(size = 10),
                               showarrow = FALSE,
                               xref = 'paper', x = 1,
@@ -94,9 +89,9 @@ Column {.tabset}
 ### Levels:
 
 ```{r}
-renderPlotly({plotly_ts(reactive_df(), 
+plotly::renderPlotly({plotly_ts(reactive_df(), 
                         Value, 
-                        comma,
+                        scales::comma,
                         "the level of "
                         )})%>%
   bindCache(input$name)
@@ -105,9 +100,9 @@ renderPlotly({plotly_ts(reactive_df(),
 ### Monthly Changes:
 
 ```{r}
-renderPlotly({plotly_ts(reactive_df(),
+plotly::renderPlotly({plotly_ts(reactive_df(),
                         `Monthly Change`, 
-                        percent,
+                        scales::percent,
                         "the monthly rate of change of ")})%>%
   bindCache(input$name)
 ```
@@ -115,9 +110,9 @@ renderPlotly({plotly_ts(reactive_df(),
 ### Annual Changes:
 
 ```{r}
-renderPlotly({plotly_ts(reactive_df(), 
+plotly::renderPlotly({plotly_ts(reactive_df(), 
                         `Annual Change`, 
-                        percent,
+                        scales::percent,
                         "the annual rate of change of ")})%>%
   bindCache(input$name)
 ```
@@ -129,7 +124,7 @@ DT::renderDataTable(server=FALSE,{
   reactive_df()%>%
     select(-Source)%>%
     mutate(Month=as.character(Month))%>%
-    datatable(extensions = "Buttons", 
+    DT::datatable(extensions = "Buttons", 
               options = list(rownames = FALSE, 
                              columnDefs = list(list(className = 'dt-center', targets = "_all")),
                              paging = TRUE,
@@ -196,16 +191,16 @@ renderPlot({
   plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`, 
                                       `Y-axis variable`, 
                                       fill=`Total Cost (M)`,
-                                      text = paste("total project cost is", comma(`Total Cost (M)`), "Million.")))+
+                                      text = paste("total project cost is", scales::comma(`Total Cost (M)`), "Million.")))+
   geom_tile()+
-  scale_fill_viridis_c(trans="log10", labels=comma)+
+  scale_fill_viridis_c(trans="log10", labels=scales::comma)+
   facet_wrap(~`Facet variable`)+
   theme_minimal()+ 
   theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))+
   labs(x=input$x_var,
        y=input$y_var)
 
-  aest_fix_labs(plt)  
+  aest::aest_fix_labs(plt)  
 })%>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
@@ -214,7 +209,7 @@ renderPlot({
   
 ```{r}
 DT::renderDataTable(server=FALSE, {mpi_group_summary()%>%
-    datatable(extensions = "Buttons", 
+    DT::datatable(extensions = "Buttons", 
               options = list(rownames = FALSE, 
                              columnDefs = list(list(className = 'dt-center', targets = "_all")),
                              paging = TRUE,
