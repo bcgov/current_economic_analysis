@@ -73,10 +73,10 @@ Time Series:
  Inputs {.sidebar}
 -------------------------------------
 
-- This dashboard allows you to visualize and download the data for `r dim(nested_dataframe)[1]` time series pertinent to British Columbia's current economic outlook. 
-- This dashboard also contains recent information on the [Major Project Inventory](https://richard-martin.shinyapps.io/Major_Project_Inventory/).
+<br>
 
-
+- This dashboard retrieves `r dim(nested_dataframe)[1]` time series pertinent to British Columbia's current economic outlook. 
+- It also contains recent information on the [Major Project Inventory](https://richard-martin.shinyapps.io/Major_Project_Inventory/).
 
 
 ```{r}
@@ -89,6 +89,9 @@ reactive_df <- reactive({
   extract_cell(nested_dataframe, input$name)
 })
 ```
+
+
+
 
 Column {.tabset}
 -----------------------------------------------------------------------
