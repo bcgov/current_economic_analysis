@@ -1,0 +1,136 @@
+---
+title: "Current Economic Outlook"
+date: "`r paste0('updated: ',as.Date(file.info(here::here('processed_data','nested_dataframe.rds'))$mtime-lubridate::hours(7)))`"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    social: menu
+    source_code: https://github.com/bcgov/current_economic_analysis
+    css: style.css
+---
+  
+```{r global, include=FALSE}
+# Copyright 2022 Province of British Columbia
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and limitations under the License.
+#libraries----------
+library(tidyverse)
+library(tsibble) #data includes a tsibble::yearquarter field
+library(lubridate) #years and months not exported by lubridate
+library(plotly) #not sure why need to load?
+#constants----------
+# with crosstalk filtering colours are not different enough (series on the same plot have basically same colour)
+# so we use manual colours with more than enough values 800! for the series we have (cut to size below).
+cbPalette <- rep(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), 100)
+#load objects----------
+source(here::here("R","functions.R"))
+ts_df <- readRDS(here::here("processed_data", "ts_df.rds"))%>%
+  mutate(Month=as.character(Month))#DT::datatable can't handle tsibble::yearmonth format: sort by month broken.
+shared_ts_df <- crosstalk::SharedData$new(ts_df)
+mpi <- readRDS(here::here("processed_data", "mpi.rds"))%>%
+    group_by(construction_type, region, project_status)%>%
+    summarize(`Estimated Cost (M)` = sum(estimated_cost, na.rm=TRUE))%>%
+    ungroup()
+cbPalette <- cbPalette[1:length(unique(ts_df$Series))]# cut the colour palette to match the number of series. 
+```
+
+
+Time Series:
+=====================================  
+ 
+ Inputs {.sidebar}
+-------------------------------------
+
+<br>
+
+- This dashboard retrieves `r length(unique(ts_df$name))` time series pertinent to British Columbia's current economic outlook. 
+- It also contains recent information on the [Major Project Inventory](https://richard-martin.shinyapps.io/Major_Project_Inventory/).
+- The data is updated nightly.
+
+
+```{r}
+crosstalk::filter_select("id", "Select a time series:", shared_ts_df, ~name, multiple = FALSE)
+```
+
+Column{.tabset}
+-----------------------------------------------------------------------
+
+### Levels:
+
+```{r}
+plotly_ts(shared_ts_df, Value, scales::comma," The value of ")
+```
+
+### Monthly Changes:
+
+```{r}
+plotly_ts(shared_ts_df, `Monthly Change`, scales::percent," The monthly change of ")
+```
+
+### Annual Changes:
+
+```{r}
+plotly_ts(shared_ts_df, `Annual Change`, scales::percent," The annual change of ")
+```
+
+### The Data:
+
+```{r}
+shared_ts_df%>%
+  DT::datatable(extensions = "Buttons", 
+                options = list( 
+                             columnDefs = list(list(className = 'dt-center', targets = "_all")),
+                             paging = TRUE,
+                             scrollX=TRUE,
+                             scrollY=TRUE,
+                             searching = TRUE,
+                             ordering = TRUE,
+                             dom = 'Btip',
+                             buttons = list(
+                                list(extend = 'csv', filename =  "datadump"),
+                                list(extend = 'excel', filename = "datadump")
+                             ),
+                             pageLength=10, 
+                             lengthMenu=c(3,5)))
+```
+
+Major Project Inventory: 
+=====================================     
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+### Plot:
+
+```{r}
+plotly_mpi(mpi, construction_type, region, project_status)
+```
+
+### Table:
+  
+```{r}
+mpi%>%
+  DT::datatable(extensions = "Buttons", 
+                options = list( 
+                             columnDefs = list(list(className = 'dt-center', targets = "_all")),
+                             paging = TRUE,
+                             scrollX=TRUE,
+                             scrollY=TRUE,
+                             searching = TRUE,
+                             ordering = TRUE,
+                             dom = 'Btip',
+                             buttons = list(
+                                list(extend = 'csv', filename =  "datadump"),
+                                list(extend = 'excel', filename = "datadump")
+                             ),
+                             pageLength=10, 
+                             lengthMenu=c(3,5)))
+```

@@ -44,13 +44,13 @@ commodity <- read_csv(commodity_url,
   filter(Month > tsibble::yearmonth(today()-years(10)))%>%
   select(Month, Series, Value, Source)
 df_list$`Bank of Canada Commodity Price Indicies` <- commodity
-#Major Project Inventory (just 5 most recent quarters)---------
+#Major Project Inventory (just most recent quarter)---------
 mpi_url_to_scrape <- "https://www2.gov.bc.ca/gov/content/employment-business/economic-development/industry/bc-major-projects-inventory/recent-reports"
 mpi_scraped <- rvest::read_html(mpi_url_to_scrape)
 mpi_links <- rvest::html_attr(rvest::html_nodes(mpi_scraped, "a"), "href") #all the links
 mpi_links <- mpi_links[mpi_links%>%startsWith("/assets/") & mpi_links%>%endsWith(".xlsx")]%>% #stubs of the links we want.
   na.omit()%>%
-  head(n = 5)
+  head(n = 1)
 mpi_links <- paste0("https://www2.gov.bc.ca", mpi_links) #paste the head onto the stubs
 mpi_files <- str_sub(mpi_links, start = -24) #names for the files
 mapply(download.file, mpi_links, here::here("raw_data", mpi_files)) #downloads all the mpi files into folder raw_data
@@ -71,6 +71,7 @@ mpi <- data.table::rbindlist(mpi_nested$data, use.names=FALSE)%>%
          last_update)%>%
   mutate(source=mpi_url_to_scrape)%>%
   arrange(last_update)
+
 #insolvencies---------
 #THIS COULD EASILY BREAK... terrible file structure
 #the first 134 rows of the excel file currently contain the info required.
@@ -109,7 +110,7 @@ df_list$`B.C. Insolvancies` <- insol%>%
   filter(Month > tsibble::yearmonth(today()-years(10)))%>%
   select(Month, Series, Value, Source)
 #S&P500--------
-df_list$`S&P 500 stock price index` <- quantmod::getSymbols("^GSPC",
+df_list$`SP 500 stock price index` <- quantmod::getSymbols("^GSPC",
                                                   from = today()-years(10),
                                                   warnings = FALSE,
                                                   auto.assign = FALSE)%>%
@@ -124,7 +125,7 @@ df_list$`S&P 500 stock price index` <- quantmod::getSymbols("^GSPC",
 #GDP_canada----------
 df_list$`GDP Canada: Chained (2012) dollars` <- get_cansim_unfiltered("36-10-0434",
                                                                       add_label = "GDP Canada: Chained (2012) dollars",
-                                                                      multiply_value_by = 1000)%>%
+                                                                      multiply_value_by = 100000)%>%
   filter(seasonal_adjustment == "Seasonally adjusted at annual rates",
         prices == "Chained (2012) dollars",
         north_american_industry_classification_system_naics == "All industries [T001]")%>%
@@ -173,7 +174,7 @@ df_list$`U.S. Exchange Rate` <- exchange_rate
 #BC merchandise trade-------
 df_list$`B.C. Merchandise Trade` <- get_cansim_unfiltered("12-10-0119",
                                                           add_label = "",
-                                                          multiply_value_by = 1000)%>%
+                                                          multiply_value_by =1000)%>%
   filter(north_american_product_classification_system_napcs == "Total of all merchandise",
          principal_trading_partners == "All countries",
          geo == "British Columbia")%>%
@@ -217,8 +218,7 @@ mutate(Value = 100*Value/forestry_index_value)%>%
 df_list$`Forestry and Energy Indicies` <- bind_rows(natural_gas, oil, forestry)
 #manufacturing: sales ---------------
 df_list$`B.C. Manufacturing Sales` <- get_cansim_unfiltered("16-10-0048",
-                                                            add_label = "Manufacturing Sales",
-                                                            multiply_value_by = 1000)%>%
+                                                            add_label = "Manufacturing Sales")%>%
   filter(seasonal_adjustment == "Seasonally adjusted",
          north_american_industry_classification_system_naics == "Manufacturing [31-33]",
          geo == "British Columbia")%>%
@@ -310,7 +310,8 @@ df_list$`B.C. + Territories New Vehicle Sales`<- get_cansim_unfiltered("20-10-00
   select(Month, Series, Value, Source)
 #lumber------------------
 df_list$`B.C. Total Softwood Production`<- get_cansim_unfiltered("16-10-0017",
-                                                                 add_label = "B.C. Total Softwood Production")%>%
+                                                                 add_label = "B.C. Total Softwood Production",
+                                                                 multiply_value_by = 1000)%>%
   filter(north_american_product_classification_system_napcs == "Total softwood, production [24112]",
          geo == "British Columbia")%>%
   select(Month, Series, Value, Source)
@@ -387,10 +388,25 @@ df_list$`B.C. International Migration` <- get_cansim_unfiltered("17-10-0040",
                                                                 add_label = "")%>%
   filter(geo == "British Columbia")%>%
   select(Month, Value, Series = components_of_population_growth, Source)
-#nest the data----------
+#nest the data to calculate changes----------
 nested_dataframe <- enframe(df_list)%>%
   mutate(value=map(value, percent_change))
+#unnest the data----------
+ts_df <- nested_dataframe%>%
+  unnest(cols = c(value))
+#optionally add commentary----------
+commentary <- ts_df%>%
+  ungroup()%>%
+  select(name, Series)%>%
+  distinct()%>%
+  mutate(commentary="")%>%
+  as.data.frame()
+commentary <- editData::editData(commentary)
+
+ts_df <- full_join(ts_df, commentary)
+
 #save the data-----------
 write_rds(nested_dataframe, here::here("processed_data", "nested_dataframe.rds"))
+write_rds(ts_df, here::here("processed_data", "ts_df.rds"))
 write_rds(mpi, here::here("processed_data", "mpi.rds"))
 

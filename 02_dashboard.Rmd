@@ -1,5 +1,6 @@
 ---
 title: "Current Economic Outlook"
+date: "`r paste0('updated: ',as.Date(file.info(here::here('processed_data','nested_dataframe.rds'))$mtime-lubridate::hours(7)))`"
 output:
   flexdashboard::flex_dashboard:
     orientation: columns
@@ -57,12 +58,7 @@ plotly_ts <- function(df, thing, format_as, tt_text){
             scale_colour_manual(values=cbPalette)+
             scale_y_continuous(label=format_as)+
             theme_minimal()
-  plotly::ggplotly(plt, tooltip="text")%>%
-    plotly::layout(annotations = list(text = paste("Source: ",df$Source[1]),
-                              font = list(size = 10),
-                              showarrow = FALSE,
-                              xref = 'paper', x = 1,
-                              yref = 'paper', y = -0.06))
+  plotly::ggplotly(plt, tooltip="text")
 }
 ```
 
@@ -77,6 +73,7 @@ Time Series:
 
 - This dashboard retrieves `r dim(nested_dataframe)[1]` time series pertinent to British Columbia's current economic outlook. 
 - It also contains recent information on the [Major Project Inventory](https://richard-martin.shinyapps.io/Major_Project_Inventory/).
+- The data is updated nightly.
 
 
 ```{r}
@@ -90,13 +87,12 @@ reactive_df <- reactive({
 })
 ```
 
-
-
-
-Column {.tabset}
+Column{.tabset}
 -----------------------------------------------------------------------
 
 ### Levels:
+
+#### 
 
 ```{r}
 plotly::renderPlotly({plotly_ts(reactive_df(), 
@@ -107,7 +103,17 @@ plotly::renderPlotly({plotly_ts(reactive_df(),
   bindCache(input$name)
 ```
 
+#### 
+
+```{r}
+renderText({
+  paste("Source: ",reactive_df()$Source[1])
+})
+```
+
 ### Monthly Changes:
+
+####
 
 ```{r}
 plotly::renderPlotly({plotly_ts(reactive_df(),
@@ -117,7 +123,17 @@ plotly::renderPlotly({plotly_ts(reactive_df(),
   bindCache(input$name)
 ```
 
+#### 
+
+```{r}
+renderText({
+  paste("Source: ",reactive_df()$Source[1])
+})
+```
+
 ### Annual Changes:
+
+####
 
 ```{r}
 plotly::renderPlotly({plotly_ts(reactive_df(), 
@@ -127,7 +143,17 @@ plotly::renderPlotly({plotly_ts(reactive_df(),
   bindCache(input$name)
 ```
 
+####
+
+```{r}
+renderText({
+  paste("Source: ",reactive_df()$Source[1])
+})
+```
+
 ### The Data:
+
+####
   
 ```{r}
 DT::renderDataTable(server=FALSE,{
@@ -153,6 +179,14 @@ DT::renderDataTable(server=FALSE,{
                              lengthMenu=c(3,5)))
   })%>%
   bindCache(input$name)
+```
+
+####
+
+```{r}
+renderText({
+  paste("Source: ",reactive_df()$Source[1])
+})
 ```
 
 Major Project Inventory: 
