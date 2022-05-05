@@ -31,6 +31,15 @@ resource_files:
 library(tidyverse)
 library(tsibble) #data includes a tsibble::yearquarter field
 library(lubridate) #years and months not exported by lubridate
+library(ggthemes)
+themes <- ls("package:ggplot2", pattern = "^theme_")
+themes <- themes[themes != "theme_get" &
+  themes != "theme_set" &
+  themes != "theme_replace" &
+  themes != "theme_test" &
+  themes != "theme_update"]
+themes <- c(themes, ls("package:ggthemes", pattern = "^theme_"))
+
 #load objects----------
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds"))
@@ -46,18 +55,26 @@ extract_cell <- function(df, nm){
   df<- df[[1]]
   return(df)
 }
-plotly_ts <- function(df, thing, format_as, tt_text){
+plotly_ts <- function(df, thing, format_as, tt_text, theme, type){
   plt <-  ggplot(df, aes(Month, 
                           {{  thing  }}, 
                           colour = Series,
+                          fill = Series,
                           group = Series,
                           text = paste(
                             "\nIn", Month, tt_text, "\n", Series,   
                             "was", format_as({{ thing  }}, accuracy = .01))))+
-            geom_line()+
             scale_colour_manual(values=cbPalette)+
+            scale_fill_manual(values=cbPalette)+
             scale_y_continuous(label=format_as)+
-            theme_minimal()
+            get(theme)()
+  if(type=="column"){
+    plt <- plt+
+       geom_col(position = "dodge", size=0)
+  }else{
+    plt <- plt+
+       geom_line() 
+  }
   plotly::ggplotly(plt, tooltip="text")
 }
 ```
@@ -82,6 +99,21 @@ selectInput("name",
             choices = nested_dataframe$name, 
             selected = nested_dataframe$name[1])
 
+selectInput(
+        "theme",
+        "Choose a plot theme:",
+        themes,
+        selected = "theme_minimal",
+        multiple = FALSE
+      )
+selectInput(
+        "type",
+        "Choose a plot type:",
+        c("line","column"),
+        selected = "line",
+        multiple = FALSE
+      )
+
 reactive_df <- reactive({
   extract_cell(nested_dataframe, input$name)
 })
@@ -98,9 +130,11 @@ Column{.tabset}
 plotly::renderPlotly({plotly_ts(reactive_df(), 
                         Value, 
                         scales::comma,
-                        "the level of "
+                        "the level of ",
+                        input$theme,
+                        input$type
                         )})%>%
-  bindCache(input$name)
+  bindCache(input$name, input$theme, input$type)
 ```
 
 #### 
@@ -119,8 +153,10 @@ renderText({
 plotly::renderPlotly({plotly_ts(reactive_df(),
                         `Monthly Change`, 
                         scales::percent,
-                        "the monthly rate of change of ")})%>%
-  bindCache(input$name)
+                        "the monthly rate of change of ",
+                        input$theme,
+                        input$type)})%>%
+  bindCache(input$name, input$theme, input$type)
 ```
 
 #### 
@@ -139,8 +175,10 @@ renderText({
 plotly::renderPlotly({plotly_ts(reactive_df(), 
                         `Annual Change`, 
                         scales::percent,
-                        "the annual rate of change of ")})%>%
-  bindCache(input$name)
+                        "the annual rate of change of ",
+                        input$theme,
+                        input$type)})%>%
+  bindCache(input$name, input$theme, input$type)
 ```
 
 ####
@@ -162,9 +200,9 @@ DT::renderDataTable(server=FALSE,{
     mutate(Month=as.character(Month),
            `Monthly Change` = scales::percent(`Monthly Change`, accuracy=.1),
            `Annual Change` = scales::percent(`Annual Change`, accuracy=.1))%>%
-    DT::datatable(extensions = "Buttons", 
-              options = list(rownames = FALSE, 
-                             columnDefs = list(list(className = 'dt-center', targets = "_all")),
+    DT::datatable(extensions = "Buttons",
+              rownames = FALSE,    
+              options = list(columnDefs = list(list(className = 'dt-center', targets = "_all")),
                              paging = TRUE,
                              scrollX=TRUE,
                              scrollY=TRUE,

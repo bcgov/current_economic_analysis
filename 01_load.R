@@ -218,7 +218,8 @@ mutate(Value = 100*Value/forestry_index_value)%>%
 df_list$`Forestry and Energy Indicies` <- bind_rows(natural_gas, oil, forestry)
 #manufacturing: sales ---------------
 df_list$`B.C. Manufacturing Sales` <- get_cansim_unfiltered("16-10-0048",
-                                                            add_label = "Manufacturing Sales")%>%
+                                                            add_label = "Manufacturing Sales",
+                                                            multiply_value_by = 1000)%>%
   filter(seasonal_adjustment == "Seasonally adjusted",
          north_american_industry_classification_system_naics == "Manufacturing [31-33]",
          geo == "British Columbia")%>%
