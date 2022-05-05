@@ -1,6 +1,6 @@
 #download from cansim and a bit of processing------------
 get_cansim_unfiltered <- function(cansim_id, add_label, multiply_value_by = 1){
-  cansim::get_cansim(cansim_id)%>%
+  cansim::get_cansim(cansim_id, factors=FALSE)%>%#change back if breaks
     janitor::clean_names()%>%
     mutate(Series = add_label,
            Month = tsibble::yearmonth(ref_date),
@@ -54,3 +54,57 @@ percent_change <- function(df){
     mutate(`Monthly Change` = Value/lag(Value)-1,
            `Annual Change` = Value/lag(Value, n = 12)-1)
 }
+# plotly time series plot------------
+plotly_ts <- function(df, thing, format_as, tt_text){
+  plt <-  ggplot(df, aes(yearmonth(Month), 
+                         {{  thing  }}, 
+                         colour = Series,
+                         group = Series,
+                         text = paste(
+                           "\nIn", 
+                           Month, 
+                           tt_text, 
+                           "\n", 
+                           Series,   
+                           "was", 
+                           format_as({{ thing  }}, accuracy = .01),
+                           "\n",
+                           ... = commentary)))+
+    geom_line()+
+    labs(x="Month")+
+    scale_y_continuous(label=format_as)+
+    scale_colour_manual(values=cbPalette)+
+    theme_minimal()
+  plotly::ggplotly(plt, tooltip="text", dynamicTicks = "y")
+}
+# plotly heatmap plot for mpi------------
+plotly_mpi <- function(df, x_var, y_var, facet_var){
+  no_missing_df <- df%>%
+    mutate(`Estimated Cost (M)`=`Estimated Cost (M)`+1)%>%#log10 scale... can't have zero.
+    complete({{  x_var  }}, {{  y_var  }}, {{  facet_var  }})
+  
+  plt <- ggplot(no_missing_df, aes({{  x_var  }},
+                                   {{  y_var  }}, 
+                                   fill=`Estimated Cost (M)`,
+                                   text=str_to_title(paste0("For ",
+                                                            {{  facet_var  }},
+                                                            " - ",
+                                                            {{  x_var  }},
+                                                            " projects in the",
+                                                            str_sub({{  y_var  }}, start=3),
+                                                            " region the Estimated Cost is ",
+                                                            scales::comma(`Estimated Cost (M)`-1, 
+                                                                  prefix = "$",
+                                                                  suffix = "(M)"),
+                                                            "."))))+
+    geom_tile()+
+    scale_fill_viridis_c(trans="log10", labels = scales::comma)+
+    facet_wrap(vars({{  facet_var  }}))+
+    theme_minimal()
+  plt <- aest::aest_fix_labs(plt)
+  plotly::ggplotly(plt, tooltip = "text")
+}
+
+
+
+
