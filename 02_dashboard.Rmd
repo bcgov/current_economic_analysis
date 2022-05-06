@@ -26,11 +26,11 @@ resource_files:
 # Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
-#libraries----------
-#library(DT)
+# libraries----------
+# library(DT)
 library(tidyverse)
-library(tsibble) #data includes a tsibble::yearquarter field
-library(lubridate) #years and months not exported by lubridate
+library(tsibble) # data includes a tsibble::yearquarter field
+library(lubridate) # years and months not exported by lubridate
 library(ggthemes)
 themes <- ls("package:ggplot2", pattern = "^theme_")
 themes <- themes[themes != "theme_get" &
@@ -40,42 +40,58 @@ themes <- themes[themes != "theme_get" &
   themes != "theme_update"]
 themes <- c(themes, ls("package:ggthemes", pattern = "^theme_"))
 
-#load objects----------
-cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+# load objects----------
 nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds"))
-mpi <- readRDS(here::here("processed_data", "mpi.rds"))%>%
-  filter(last_update>today()-years(5)) # a single project had a last_update value of 2016?
-#functions------------
-#Extractor function (retrieve cell)---------- 
-extract_cell <- function(df, nm){
-  df <- df%>%
-    filter(name==nm)%>%
-    select(value)%>%
+mpi <- readRDS(here::here("processed_data", "mpi.rds")) %>%
+  filter(last_update > today() - years(5)) # a single project had a last_update value of 2016?
+# functions------------
+# Extractor function (retrieve cell)----------
+extract_cell <- function(df, nm) {
+  df <- df %>%
+    filter(name == nm) %>%
+    select(value) %>%
     pull()
-  df<- df[[1]]
+  df <- df[[1]]
   return(df)
 }
-plotly_ts <- function(df, thing, format_as, tt_text, theme, type){
-  plt <-  ggplot(df, aes(Month, 
-                          {{  thing  }}, 
-                          colour = Series,
-                          fill = Series,
-                          group = Series,
-                          text = paste(
-                            "\nIn", Month, tt_text, "\n", Series,   
-                            "was", format_as({{ thing  }}, accuracy = .01))))+
-            scale_colour_manual(values=cbPalette)+
-            scale_fill_manual(values=cbPalette)+
-            scale_y_continuous(label=format_as)+
-            get(theme)()
-  if(type=="column"){
-    plt <- plt+
-       geom_col(position = "dodge", size=0)
-  }else{
-    plt <- plt+
-       geom_line() 
+plotly_ts <- function(df, thing, format_as, tt_text, theme, type, pal) {
+  # df <- df%>%
+  #   group_by(Series)%>%
+  #   mutate(label = if_else(Month == max(Month), as.character(Series), NA_character_))
+ 
+  plt <- ggplot(df, aes(Month,
+    {{ thing }},
+    colour = Series,
+    fill = Series,
+    group = Series,
+    text = paste(
+      "\nIn", Month, tt_text, "\n", Series,
+      "was", format_as({{ thing }}, accuracy = .01)
+    )
+  )) +
+    scale_y_continuous(label = format_as) +
+    get(theme)()
+  if (type == "column") {
+    plt <- plt +
+      geom_col(position = "dodge", size = 0)
+  } else {
+    plt <- plt +
+      geom_line()
   }
-  plotly::ggplotly(plt, tooltip="text")
+  if (pal == "Viridis") {
+    plt <- plt +
+      scale_colour_viridis_d() +
+      scale_fill_viridis_d()
+  } else {
+    plt <- plt +
+      scale_colour_brewer(palette = pal) +
+      scale_fill_brewer(palette = pal)
+  }
+  # plt <- plt+
+  #   theme(legend.position='none')+ 
+  #   expand_limits(x =tsibble::yearmonth(lubridate::today()+lubridate::years(3)))+
+  #   geom_text(aes(label = label), hjust = 0, nudge_x = 500)
+  plotly::ggplotly(plt, tooltip = "text")
 }
 ```
 
@@ -94,25 +110,35 @@ Time Series:
 
 
 ```{r}
-selectInput("name", 
-            label = "Choose a data set:",
-            choices = nested_dataframe$name, 
-            selected = nested_dataframe$name[1])
+selectInput("name",
+  label = "Choose a data set:",
+  choices = nested_dataframe$name,
+  selected = nested_dataframe$name[1]
+)
 
 selectInput(
-        "theme",
-        "Choose a plot theme:",
-        themes,
-        selected = "theme_minimal",
-        multiple = FALSE
-      )
+  "theme",
+  "Choose a plot theme:",
+  themes,
+  selected = "theme_minimal",
+  multiple = FALSE
+)
 selectInput(
-        "type",
-        "Choose a plot type:",
-        c("line","column"),
-        selected = "line",
-        multiple = FALSE
-      )
+  "type",
+  "Choose a plot type:",
+  c("line", "column"),
+  selected = "line",
+  multiple = FALSE
+)
+
+selectInput(
+  "pal",
+  "Choose a colour palette:",
+  c("Viridis", "Set2", "Paired", "Dark2"),
+  selected = "Dark2",
+  multiple = FALSE
+)
+
 
 reactive_df <- reactive({
   extract_cell(nested_dataframe, input$name)
@@ -127,21 +153,28 @@ Column{.tabset}
 #### 
 
 ```{r}
-plotly::renderPlotly({plotly_ts(reactive_df(), 
-                        Value, 
-                        scales::comma,
-                        "the level of ",
-                        input$theme,
-                        input$type
-                        )})%>%
-  bindCache(input$name, input$theme, input$type)
+plotly::renderPlotly({
+  plotly_ts(
+    reactive_df(),
+    Value,
+    scales::comma,
+    "the level of ",
+    input$theme,
+    input$type,
+    input$pal
+  )
+}) %>%
+  bindCache(
+    input$name, input$theme, input$type,
+    input$pal
+  )
 ```
 
 #### 
 
 ```{r}
 renderText({
-  paste("Source: ",reactive_df()$Source[1])
+  paste("Source: ", reactive_df()$Source[1])
 })
 ```
 
@@ -150,20 +183,28 @@ renderText({
 ####
 
 ```{r}
-plotly::renderPlotly({plotly_ts(reactive_df(),
-                        `Monthly Change`, 
-                        scales::percent,
-                        "the monthly rate of change of ",
-                        input$theme,
-                        input$type)})%>%
-  bindCache(input$name, input$theme, input$type)
+plotly::renderPlotly({
+  plotly_ts(
+    reactive_df(),
+    `Monthly Change`,
+    scales::percent,
+    "the monthly rate of change of ",
+    input$theme,
+    input$type,
+    input$pal
+  )
+}) %>%
+  bindCache(
+    input$name, input$theme, input$type,
+    input$pal
+  )
 ```
 
 #### 
 
 ```{r}
 renderText({
-  paste("Source: ",reactive_df()$Source[1])
+  paste("Source: ", reactive_df()$Source[1])
 })
 ```
 
@@ -172,20 +213,28 @@ renderText({
 ####
 
 ```{r}
-plotly::renderPlotly({plotly_ts(reactive_df(), 
-                        `Annual Change`, 
-                        scales::percent,
-                        "the annual rate of change of ",
-                        input$theme,
-                        input$type)})%>%
-  bindCache(input$name, input$theme, input$type)
+plotly::renderPlotly({
+  plotly_ts(
+    reactive_df(),
+    `Annual Change`,
+    scales::percent,
+    "the annual rate of change of ",
+    input$theme,
+    input$type,
+    input$pal
+  )
+}) %>%
+  bindCache(
+    input$name, input$theme, input$type,
+    input$pal
+  )
 ```
 
 ####
 
 ```{r}
 renderText({
-  paste("Source: ",reactive_df()$Source[1])
+  paste("Source: ", reactive_df()$Source[1])
 })
 ```
 
@@ -194,28 +243,34 @@ renderText({
 ####
   
 ```{r}
-DT::renderDataTable(server=FALSE,{
-  reactive_df()%>%
-    select(-Source)%>%
-    mutate(Month=as.character(Month),
-           `Monthly Change` = scales::percent(`Monthly Change`, accuracy=.1),
-           `Annual Change` = scales::percent(`Annual Change`, accuracy=.1))%>%
-    DT::datatable(extensions = "Buttons",
-              rownames = FALSE,    
-              options = list(columnDefs = list(list(className = 'dt-center', targets = "_all")),
-                             paging = TRUE,
-                             scrollX=TRUE,
-                             scrollY=TRUE,
-                             searching = TRUE,
-                             ordering = TRUE,
-                             dom = 'Btip',
-                             buttons = list(
-                                list(extend = 'csv', filename =  input$name),
-                                list(extend = 'excel', filename = input$name)
-                             ),
-                             pageLength=10, 
-                             lengthMenu=c(3,5)))
-  })%>%
+DT::renderDataTable(server = FALSE, {
+  reactive_df() %>%
+    select(-Source) %>%
+    mutate(
+      Month = as.character(Month),
+      `Monthly Change` = scales::percent(`Monthly Change`, accuracy = .1),
+      `Annual Change` = scales::percent(`Annual Change`, accuracy = .1)
+    ) %>%
+    DT::datatable(
+      extensions = "Buttons",
+      rownames = FALSE,
+      options = list(
+        columnDefs = list(list(className = "dt-center", targets = "_all")),
+        paging = TRUE,
+        scrollX = TRUE,
+        scrollY = TRUE,
+        searching = TRUE,
+        ordering = TRUE,
+        dom = "Btip",
+        buttons = list(
+          list(extend = "csv", filename = input$name),
+          list(extend = "excel", filename = input$name)
+        ),
+        pageLength = 10,
+        lengthMenu = c(3, 5)
+      )
+    )
+}) %>%
   bindCache(input$name)
 ```
 
@@ -223,7 +278,7 @@ DT::renderDataTable(server=FALSE,{
 
 ```{r}
 renderText({
-  paste("Source: ",reactive_df()$Source[1])
+  paste("Source: ", reactive_df()$Source[1])
 })
 ```
 
@@ -234,33 +289,43 @@ Inputs {.sidebar}
 -------------------------------------
 
 ```{r}
-char_cols <- colnames(mpi)[sapply(mpi,class)=="character"]
-possible_vars <- char_cols[char_cols!="source"]
+char_cols <- colnames(mpi)[sapply(mpi, class) == "character"]
+possible_vars <- char_cols[char_cols != "source"]
 
-selectInput("filter_var", label = "Choose a quarter:",
-            choices = unique(mpi$last_update), selected = tail(unique(mpi$last_update)))
-selectInput("x_var", label = "Choose a variable for x axis:",
-            choices = possible_vars, selected = "region")
-selectInput("y_var", label = "Choose a variable for y axis:",
-            choices = possible_vars, selected = "project_stage")
-selectInput("facet_var", label = "Choose a variable to facet by:",
-            choices = possible_vars, selected = "project_status")
+selectInput("filter_var",
+  label = "Choose a quarter:",
+  choices = unique(mpi$last_update), selected = tail(unique(mpi$last_update))
+)
+selectInput("x_var",
+  label = "Choose a variable for x axis:",
+  choices = possible_vars, selected = "region"
+)
+selectInput("y_var",
+  label = "Choose a variable for y axis:",
+  choices = possible_vars, selected = "project_stage"
+)
+selectInput("facet_var",
+  label = "Choose a variable to facet by:",
+  choices = possible_vars, selected = "project_status"
+)
 
 observe({
-  updateSelectInput(session, "y_var", choices= possible_vars[possible_vars!=input$x_var])
+  updateSelectInput(session, "y_var", choices = possible_vars[possible_vars != input$x_var])
 })
 observe({
-  updateSelectInput(session, "facet_var", choices= possible_vars[possible_vars!=input$x_var & possible_vars!=input$y_var])
+  updateSelectInput(session, "facet_var", choices = possible_vars[possible_vars != input$x_var & possible_vars != input$y_var])
 })
 
 mpi_group_summary <- reactive({
-  mpi%>%
-  filter(as.character(last_update) == as.character(input$filter_var))%>%
-  group_by_(`X-axis variable`=input$x_var, #group_by_ DEPRECATED.
-            `Y-axis variable`=input$y_var,
-            `Facet variable`=input$facet_var)%>%
-  summarize(`Total Cost (M)`=sum(estimated_cost, na.rm=TRUE))%>%
-  filter(`Total Cost (M)`>0)
+  mpi %>%
+    filter(as.character(last_update) == as.character(input$filter_var)) %>%
+    group_by_(
+      `X-axis variable` = input$x_var, # group_by_ DEPRECATED.
+      `Y-axis variable` = input$y_var,
+      `Facet variable` = input$facet_var
+    ) %>%
+    summarize(`Total Cost (M)` = sum(estimated_cost, na.rm = TRUE)) %>%
+    filter(`Total Cost (M)` > 0)
 })
 ```
 
@@ -272,42 +337,50 @@ Column {.tabset}
 ```{r}
 
 renderPlot({
-  plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`, 
-                                      `Y-axis variable`, 
-                                      fill=`Total Cost (M)`,
-                                      text = paste("total project cost is", scales::comma(`Total Cost (M)`), "Million.")))+
-  geom_tile()+
-  scale_fill_viridis_c(trans="log10", labels=scales::comma)+
-  facet_wrap(~`Facet variable`)+
-  theme_minimal()+ 
-  theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))+
-  labs(x=input$x_var,
-       y=input$y_var)
+  plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`,
+    `Y-axis variable`,
+    fill = `Total Cost (M)`,
+    text = paste("total project cost is", scales::comma(`Total Cost (M)`), "Million.")
+  )) +
+    geom_tile() +
+    scale_fill_viridis_c(trans = "log10", labels = scales::comma) +
+    facet_wrap(~`Facet variable`) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1)) +
+    labs(
+      x = input$x_var,
+      y = input$y_var
+    )
 
-  aest::aest_fix_labs(plt)  
-})%>%
+  aest::aest_fix_labs(plt)
+}) %>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
 
 ### Table:
   
 ```{r}
-DT::renderDataTable(server=FALSE, {mpi_group_summary()%>%
-    DT::datatable(extensions = "Buttons", 
-              options = list(rownames = FALSE, 
-                             columnDefs = list(list(className = 'dt-center', targets = "_all")),
-                             paging = TRUE,
-                             scrollX=TRUE,
-                             scrollY=TRUE,
-                             searching = TRUE,
-                             ordering = TRUE,
-                             dom = 'Btip',
-                             buttons = list(
-                                list(extend = 'csv', filename =  "MPI"),
-                                list(extend = 'excel', filename = "MPI")
-                             ),
-                             pageLength=10, 
-                             lengthMenu=c(3,5)))
-})%>%
+DT::renderDataTable(server = FALSE, {
+  mpi_group_summary() %>%
+    DT::datatable(
+      extensions = "Buttons",
+      options = list(
+        rownames = FALSE,
+        columnDefs = list(list(className = "dt-center", targets = "_all")),
+        paging = TRUE,
+        scrollX = TRUE,
+        scrollY = TRUE,
+        searching = TRUE,
+        ordering = TRUE,
+        dom = "Btip",
+        buttons = list(
+          list(extend = "csv", filename = "MPI"),
+          list(extend = "excel", filename = "MPI")
+        ),
+        pageLength = 10,
+        lengthMenu = c(3, 5)
+      )
+    )
+}) %>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
