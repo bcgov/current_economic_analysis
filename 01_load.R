@@ -215,7 +215,8 @@ forestry <- forestry%>%
 mutate(Value = 100*Value/forestry_index_value)%>%
   filter(Month > tsibble::yearmonth(today()-years(10)))%>%
   select(Month, Series, Value, Source)
-df_list$`Forestry and Energy Indicies` <- bind_rows(natural_gas, oil, forestry)
+df_list$`Forestry and Energy Indicies` <- bind_rows(natural_gas, oil, forestry)%>%
+  arrange(Month)
 #manufacturing: sales ---------------
 df_list$`B.C. Manufacturing Sales` <- get_cansim_unfiltered("16-10-0048",
                                                             add_label = "Manufacturing Sales",
