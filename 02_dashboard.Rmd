@@ -158,7 +158,10 @@ plotly::renderPlotly({
   )
 }) %>%
   bindCache(
-    input$name, input$theme, input$type,
+    "level",
+    input$name, 
+    input$theme, 
+    input$type,
     input$pal
   )
 renderText({
@@ -183,7 +186,10 @@ plotly::renderPlotly({
   )
 }) %>%
   bindCache(
-    input$name, input$theme, input$type,
+    "change",
+    input$name, 
+    input$theme, 
+    input$type,
     input$pal
   )
 renderText({
@@ -208,7 +214,10 @@ plotly::renderPlotly({
   )
 }) %>%
   bindCache(
-    input$name, input$theme, input$type,
+    "annual change",
+    input$name, 
+    input$theme, 
+    input$type,
     input$pal
   )
 

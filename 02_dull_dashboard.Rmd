@@ -69,13 +69,13 @@ Column{.tabset}
 plotly_ts(shared_ts_df, Value, scales::comma," The value of ")
 ```
 
-### Monthly Changes:
+### Change:
 
 ```{r}
-plotly_ts(shared_ts_df, `Monthly Change`, scales::percent," The monthly change of ")
+plotly_ts(shared_ts_df, `Change`, scales::percent," The change of ")
 ```
 
-### Annual Changes:
+### Annual Change:
 
 ```{r}
 plotly_ts(shared_ts_df, `Annual Change`, scales::percent," The annual change of ")

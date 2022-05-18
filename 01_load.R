@@ -26,6 +26,27 @@ options("getSymbols.yahoo.warning" = FALSE)
 #constants---------
 index_date <- tsibble::yearmonth(ym("2014-01"))# date for indexing forestry, oil, natural gas
 df_list <- list() #storage list for all dataframes
+#building permits HUGE file... can't load into memory.-------
+cansim_id <- "34-10-0066-01"
+connection <- cansim::get_cansim_sqlite(cansim_id)
+df_list$`Building Permits`<- connection %>%
+  filter(GEO=="British Columbia",
+         Variables=="Value of permits",
+         `Seasonal adjustment`=="Seasonally adjusted, constant",
+         `Type of work`=="Types of work, total",
+         `Type of structure` %in% c("Total residential","Total non-residential")
+  )%>%
+  cansim::collect_and_normalize()%>%
+  janitor::clean_names()%>%
+  mutate(
+    Series = type_of_structure,
+    Month = tsibble::yearmonth(ref_date),
+    Value = value * 1000,
+    Source = paste0("Cansim: ", cansim_id)
+  ) %>%
+  filter(Month > tsibble::yearmonth(lubridate::today() - lubridate::years(10)))%>%
+  select(Month, Series, Value, Source)
+cansim::disconnect_cansim_sqlite(connection)
 #commodity prices-------
 commodity_url <- "https://www.bankofcanada.ca/valet/observations/group/BCPI_MONTHLY/csv?start_date=1972-01-01"
 commodity_names <- read_csv(commodity_url,
