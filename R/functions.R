@@ -1,12 +1,12 @@
 # download from cansim and a bit of processing------------
-get_cansim_unfiltered <- function(cansim_id, add_label, multiply_value_by = 1) {
+get_cansim_unfiltered <- function(cansim_id, add_label, multiply_value_by = 1, source_text) {
   cansim::get_cansim(cansim_id, factors = FALSE) %>% # change back if breaks
     janitor::clean_names() %>%
     mutate(
       Series = add_label,
       Month = tsibble::yearmonth(ref_date),
       Value = value * multiply_value_by,
-      Source = paste0("Cansim: ", cansim_id)
+      Source = paste("Statistics Canada. Table", cansim_id, source_text, sep=" ")
     ) %>%
     filter(Month > tsibble::yearmonth(today() - years(10)))
 }

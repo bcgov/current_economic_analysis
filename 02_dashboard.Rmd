@@ -55,7 +55,7 @@ extract_cell <- function(tbbl, nm) {
   tbbl <- tbbl[[1]]
   return(tbbl)
 }
-plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal) {
+plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title) {
   plt <- ggplot(tbbl, aes(Month,
     {{ thing }},
     colour = Series,
@@ -84,6 +84,9 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal) {
       scale_colour_brewer(palette = pal) +
       scale_fill_brewer(palette = pal)
   }
+  plt <- plt+
+    labs(title=str_split(title,":")[[1]][1],
+         x="")
   plotly::ggplotly(plt, tooltip = "text")
 }
 ```
@@ -154,7 +157,8 @@ plotly::renderPlotly({
     "the level of ",
     input$theme,
     input$type,
-    input$pal
+    input$pal,
+    title=input$name
   )
 }) %>%
   bindCache(
@@ -182,7 +186,8 @@ plotly::renderPlotly({
     "the rate of change of ",
     input$theme,
     input$type,
-    input$pal
+    input$pal,
+    title=input$name
   )
 }) %>%
   bindCache(
@@ -210,7 +215,8 @@ plotly::renderPlotly({
     "the annual rate of change of ",
     input$theme,
     input$type,
-    input$pal
+    input$pal,
+    title=input$name
   )
 }) %>%
   bindCache(
