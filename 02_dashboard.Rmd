@@ -215,8 +215,12 @@ plotly::renderPlotly({
     input$pal,
     input$span
   )
-renderText({
-  paste("Source: ", reactive_df()$Source[1])
+renderUI({
+  if(str_detect(reactive_df()$Source[1], "http")){
+     HTML(paste("Source: <a href='",reactive_df()$Source[1],"'>",reactive_df()$Source[1],"</a>"))
+  } else {
+    paste("Source: ", reactive_df()$Source[1])
+  } 
 })
 ```
 
@@ -246,9 +250,12 @@ plotly::renderPlotly({
     input$pal,
     input$span
   )
-
-renderText({
-  paste("Source: ", reactive_df()$Source[1])
+renderUI({
+  if(str_detect(reactive_df()$Source[1], "http")){
+     HTML(paste("Source: <a href='",reactive_df()$Source[1],"'>",reactive_df()$Source[1],"</a>"))
+  } else {
+    paste("Source: ", reactive_df()$Source[1])
+  } 
 })
 ```
 

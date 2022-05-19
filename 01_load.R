@@ -195,7 +195,8 @@ mortgage_rates <- get_cansim_unfiltered("34-10-0145",
                                         source_text = "Canada Mortgage and Housing Corporation, conventional mortgage lending rate, 5-year term"
                                         )%>%
   select(Month, Series, Value, Source)
-df_list$`Canada Monthly interest rates/yields` <- bind_rows(interest_rates, mortgage_rates)
+df_list$`Canada Monthly interest rates/yields` <- bind_rows(interest_rates, mortgage_rates)%>%
+  mutate(Source = paste(interest_rates$Source[1],mortgage_rates$Source[1], sep = " AND "))
 #CADUSD exchange_rate---------
 #(series broken into 2 files that overlap)
 exchange_rate1 <- get_cansim_unfiltered("33-10-0163",
