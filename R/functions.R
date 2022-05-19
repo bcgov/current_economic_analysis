@@ -126,34 +126,4 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, 
 
 
 
-# plotly heatmap plot for mpi------------
-plotly_mpi <- function(tbbl, x_var, y_var, facet_var) {
-  no_missing_df <- tbbl %>%
-    mutate(`Estimated Cost (M)` = `Estimated Cost (M)` + 1) %>% # log10 scale... can't have zero.
-    complete({{ x_var }}, {{ y_var }}, {{ facet_var }})
 
-  plt <- ggplot(no_missing_df, aes({{ x_var }},
-    {{ y_var }},
-    fill = `Estimated Cost (M)`,
-    text = str_to_title(paste0(
-      "For ",
-      {{ facet_var }},
-      " - ",
-      {{ x_var }},
-      " projects in the",
-      str_sub({{ y_var }}, start = 3),
-      " region the Estimated Cost is ",
-      scales::comma(`Estimated Cost (M)` - 1,
-        prefix = "$",
-        suffix = "(M)"
-      ),
-      "."
-    ))
-  )) +
-    geom_tile() +
-    scale_fill_viridis_c(trans = "log10", labels = scales::comma) +
-    facet_wrap(vars({{ facet_var }})) +
-    theme_minimal()
-  plt <- aest::aest_fix_labs(plt)
-  plotly::ggplotly(plt, tooltip = "text")
-}

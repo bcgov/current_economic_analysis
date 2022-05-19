@@ -307,12 +307,11 @@ Column {.tabset}
 ### Plot:
 
 ```{r}
-
-renderPlot({
+plotly::renderPlotly({
   plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`,
     `Y-axis variable`,
     fill = `Total Cost (M)`,
-    text = paste("total project cost is", scales::comma(`Total Cost (M)`), "Million.")
+    text = paste("Total project cost is", scales::comma(`Total Cost (M)`), "Million.")
   )) +
     geom_tile() +
     scale_fill_viridis_c(trans = "log10", labels = scales::comma) +
@@ -323,8 +322,8 @@ renderPlot({
       x = input$x_var,
       y = input$y_var
     )
-
-  aest::aest_fix_labs(plt)
+  plt <- aest::aest_fix_labs(plt)
+  plotly::ggplotly(plt, tooltip = "text")
 }) %>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
