@@ -71,9 +71,12 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title) 
   if (type == "column") {
     plt <- plt +
       geom_col(position = "dodge", size = 0)
-  } else {
+  } else if (type == "line") {
     plt <- plt +
       geom_line()
+  } else {
+    plt <- plt +
+      geom_smooth(se=FALSE, span=.1, lwd=.5)
   }
   if (pal == "Viridis") {
     plt <- plt +
@@ -122,7 +125,7 @@ selectInput(
 selectInput(
   "type",
   "Choose a plot type:",
-  c("line", "column"),
+  c("line", "column", "smooth"),
   selected = "line",
   multiple = FALSE
 )
@@ -241,7 +244,7 @@ DT::renderDataTable(server = FALSE, {
   reactive_df() %>%
     select(-Source) %>%
     mutate(
-      Month = as.character(Month),
+      Month = as.Date(Month),
       `Change` = scales::percent(`Change`, accuracy = .1),
       `Annual Change` = scales::percent(`Annual Change`, accuracy = .1)
     ) %>%
