@@ -355,3 +355,16 @@ DT::renderDataTable(server = FALSE, {
 }) %>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
+
+Commentary: 
+===================================== 
+
+### Commentary
+
+```{r}
+  includeMarkdown(here::here("commentary", "commentary.md"))
+```
+
+
+
+
