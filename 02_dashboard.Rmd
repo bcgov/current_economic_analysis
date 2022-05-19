@@ -40,59 +40,11 @@ themes <- themes[
   themes != "theme_test" &
   themes != "theme_update"]
 themes <- c(themes, ls("package:ggthemes", pattern = "^theme_"))
-
 # load objects----------
 nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds"))
 mpi <- readRDS(here::here("processed_data", "mpi.rds")) %>%
   filter(last_update > today() - years(5)) # a single project had a last_update value of 2016?
-# functions------------
-# Extractor function (retrieve cell)----------
-extract_cell <- function(tbbl, nm) {
-  tbbl <- tbbl %>%
-    filter(name == nm) %>%
-    select(value) %>%
-    pull()
-  tbbl <- tbbl[[1]]
-  return(tbbl)
-}
-plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, spn) {
-  plt <- ggplot(tbbl, aes(Month,
-    {{ thing }},
-    colour = Series,
-    fill = Series,
-    group = Series,
-    text = paste(
-      "\nIn", Month, tt_text, "\n", Series,
-      "was", format_as({{ thing }}, accuracy = .01)
-    )
-  )) +
-    scale_y_continuous(label = format_as) +
-    get(theme)()
-  if (type == "column") {
-    plt <- plt +
-      geom_col(position = "dodge", size = 0)
-  } else if (type == "line") {
-    plt <- plt +
-      geom_line()
-  } else {
-    plt <- plt +
-      geom_smooth(se=FALSE, span = spn, lwd=.5)+
-      geom_line(alpha=.2, lwd=.2)
-  }
-  if (pal == "Viridis") {
-    plt <- plt +
-      scale_colour_viridis_d() +
-      scale_fill_viridis_d()
-  } else {
-    plt <- plt +
-      scale_colour_brewer(palette = pal) +
-      scale_fill_brewer(palette = pal)
-  }
-  plt <- plt+
-    labs(title=str_split(title,":")[[1]][1],
-         x="")
-  plotly::ggplotly(plt, tooltip = "text")
-}
+source(here::here("R","functions.R"))
 ```
 
 
@@ -293,8 +245,12 @@ DT::renderDataTable(server = FALSE, {
     )
 }) %>%
   bindCache(input$name)
-renderText({
-  paste("Source: ", reactive_df()$Source[1])
+renderUI({
+  if(str_detect(reactive_df()$Source[1], "http")){
+     HTML(paste("Source: <a href='",reactive_df()$Source[1],"'>",reactive_df()$Source[1],"</a>"))
+  } else {
+    paste("Source: ", reactive_df()$Source[1])
+  } 
 })
 ```
 

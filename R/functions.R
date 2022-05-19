@@ -74,31 +74,58 @@ percent_change <- function(tbbl) {
       `Annual Change` = Value / lag(Value, n = num_lags) - 1
     )
   }
-# plotly time series plot------------
-plotly_ts <- function(tbbl, thing, format_as, tt_text) {
-  plt <- ggplot(tbbl, aes(yearmonth(Month),
-    {{ thing }},
-    colour = Series,
-    group = Series,
-    text = paste(
-      "\nIn",
-      Month,
-      tt_text,
-      "\n",
-      Series,
-      "was",
-      format_as({{ thing }}, accuracy = .01),
-      "\n",
-      ... = commentary
-    )
-  )) +
-    geom_line() +
-    labs(x = "Month") +
-    scale_y_continuous(label = format_as) +
-    scale_colour_manual(values = cbPalette) +
-    theme_minimal()
-  plotly::ggplotly(plt, tooltip = "text", dynamicTicks = "y")
+# Extractor function (retrieve cell)----------
+extract_cell <- function(tbbl, nm) {
+  tbbl <- tbbl %>%
+    filter(name == nm) %>%
+    select(value) %>%
+    pull()
+  tbbl <- tbbl[[1]]
+  return(tbbl)
 }
+# plotly time series plot------------
+plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, spn) {
+  plt <- ggplot(tbbl, aes(Month,
+                          {{ thing }},
+                          colour = Series,
+                          fill = Series,
+                          group = Series,
+                          text = paste(
+                            "\nIn", Month, tt_text, "\n", Series,
+                            "was", format_as({{ thing }}, accuracy = .01)
+                          )
+  )) +
+    scale_y_continuous(label = format_as) +
+    get(theme)()
+  if (type == "column") {
+    plt <- plt +
+      geom_col(position = "dodge", size = 0)
+  } else if (type == "line") {
+    plt <- plt +
+      geom_line()
+  } else {
+    plt <- plt +
+      geom_smooth(se=FALSE, span = spn, lwd=.5)+
+      geom_line(alpha=.2, lwd=.2)
+  }
+  if (pal == "Viridis") {
+    plt <- plt +
+      scale_colour_viridis_d() +
+      scale_fill_viridis_d()
+  } else {
+    plt <- plt +
+      scale_colour_brewer(palette = pal) +
+      scale_fill_brewer(palette = pal)
+  }
+  plt <- plt+
+    labs(title=str_split(title,":")[[1]][1],
+         x="")
+  plotly::ggplotly(plt, tooltip = "text")
+}
+
+
+
+
 # plotly heatmap plot for mpi------------
 plotly_mpi <- function(tbbl, x_var, y_var, facet_var) {
   no_missing_df <- tbbl %>%
