@@ -55,7 +55,7 @@ extract_cell <- function(tbbl, nm) {
   tbbl <- tbbl[[1]]
   return(tbbl)
 }
-plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title) {
+plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, spn) {
   plt <- ggplot(tbbl, aes(Month,
     {{ thing }},
     colour = Series,
@@ -76,7 +76,8 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title) 
       geom_line()
   } else {
     plt <- plt +
-      geom_smooth(se=FALSE, span=.1, lwd=.5)
+      geom_smooth(se=FALSE, span = spn, lwd=.5)+
+      geom_line(alpha=.2, lwd=.2)
   }
   if (pal == "Viridis") {
     plt <- plt +
@@ -104,29 +105,36 @@ Time Series:
 <br>
 
 - This dashboard retrieves `r dim(nested_dataframe)[1]` time series pertinent to British Columbia's current economic outlook. 
-- It also contains recent information on the [Major Project Inventory](https://richard-martin.shinyapps.io/Major_Project_Inventory/).
 - The data is updated nightly.
 
 
 ```{r}
 selectInput("name",
   label = "Choose a data set:",
-  choices = nested_dataframe$name,
-  selected = nested_dataframe$name[1]
-)
-
-selectInput(
-  "theme",
-  "Choose a plot theme:",
-  themes,
-  selected = "theme_minimal",
-  multiple = FALSE
+  choices = sort(nested_dataframe$name, decreasing = TRUE),
+  selected = sort(nested_dataframe$name, decreasing = TRUE)[1]
 )
 selectInput(
   "type",
   "Choose a plot type:",
   c("line", "column", "smooth"),
   selected = "line",
+  multiple = FALSE
+)
+conditionalPanel(
+          condition = "input.type == 'smooth'",
+          sliderInput(
+  "span",
+  "how smooth?",
+  .1,
+  .9,
+  .5)
+)
+selectInput(
+  "theme",
+  "Choose a plot theme:",
+  themes,
+  selected = "theme_minimal",
   multiple = FALSE
 )
 
@@ -137,7 +145,6 @@ selectInput(
   selected = "Dark2",
   multiple = FALSE
 )
-
 
 reactive_df <- reactive({
   extract_cell(nested_dataframe, input$name)
@@ -161,7 +168,8 @@ plotly::renderPlotly({
     input$theme,
     input$type,
     input$pal,
-    title=input$name
+    title=input$name,
+    spn = input$span
   )
 }) %>%
   bindCache(
@@ -169,14 +177,19 @@ plotly::renderPlotly({
     input$name, 
     input$theme, 
     input$type,
-    input$pal
+    input$pal,
+    input$span
   )
-renderText({
-  paste("Source: ", reactive_df()$Source[1])
+renderUI({
+  if(str_detect(reactive_df()$Source[1], "http")){
+     HTML(paste("Source: <a href='",reactive_df()$Source[1],"'>",reactive_df()$Source[1],"</a>"))
+  } else {
+    paste("Source: ", reactive_df()$Source[1])
+  } 
 })
 ```
 
-### Change:
+### Change from last observation:
 
 ####
 
@@ -190,7 +203,8 @@ plotly::renderPlotly({
     input$theme,
     input$type,
     input$pal,
-    title=input$name
+    title=input$name,
+    spn = input$span
   )
 }) %>%
   bindCache(
@@ -198,7 +212,8 @@ plotly::renderPlotly({
     input$name, 
     input$theme, 
     input$type,
-    input$pal
+    input$pal,
+    input$span
   )
 renderText({
   paste("Source: ", reactive_df()$Source[1])
@@ -219,7 +234,8 @@ plotly::renderPlotly({
     input$theme,
     input$type,
     input$pal,
-    title=input$name
+    title=input$name,
+    spn = input$span
   )
 }) %>%
   bindCache(
@@ -227,7 +243,8 @@ plotly::renderPlotly({
     input$name, 
     input$theme, 
     input$type,
-    input$pal
+    input$pal,
+    input$span
   )
 
 renderText({

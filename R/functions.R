@@ -3,6 +3,7 @@ get_cansim_unfiltered <- function(cansim_id, add_label, multiply_value_by = 1, s
   cansim::get_cansim(cansim_id, factors = FALSE) %>% # change back if breaks
     janitor::clean_names() %>%
     mutate(
+      geo=str_trim(geo),
       Series = add_label,
       Month = tsibble::yearmonth(ref_date),
       Value = value * multiply_value_by,
