@@ -1,15 +1,17 @@
 # download from cansim and a bit of processing------------
-get_cansim_unfiltered <- function(cansim_id, add_label, multiply_value_by = 1, source_text) {
-  cansim::get_cansim(cansim_id, factors = FALSE) %>% # change back if breaks
-    janitor::clean_names() %>%
+get_cansim_unfiltered <- function(cansim_id, add_label, multiply_value_by = 1, source_text, date_parse = lubridate::ym) {
+  temp <- cansim::get_cansim(cansim_id, factors = FALSE) %>% # change back if breaks
+    janitor::clean_names() 
+#  browser()
+  temp <- temp%>%
     mutate(
       geo=str_trim(geo),
       Series = add_label,
-      period_starts = tsibble::yearmonth(ref_date),
+      `Period Starting` = date_parse(ref_date),
       Value = value * multiply_value_by,
       Source = paste("Statistics Canada. Table", cansim_id, source_text, sep=" ")
     ) %>%
-    filter(period_starts > tsibble::yearmonth(today() - years(10)))
+    filter(`Period Starting` > today() - years(10))
 }
 # convert JSON data to tibble------------
 df_from_JSON <- function(url, add_label, index_date) {
@@ -17,20 +19,21 @@ df_from_JSON <- function(url, add_label, index_date) {
   tbbl <- as.data.frame(tbbl)
   tbbl <- as.data.frame(tbbl$series.data)
   colnames(tbbl) <- c("ref_date", "value")
+#  browser()
   tbbl <- tbbl %>%
     mutate(
-      period_starts = tsibble::yearmonth(paste0(substring(ref_date, 1, 4), "-", substring(ref_date, 5, 6))),
+      `Period Starting` = lubridate::ym(paste0(substring(ref_date, 1, 4), "-", substring(ref_date, 5, 6))),
       Series = add_label,
       Value = as.numeric(value),
       Source = url
     )
   df_index_value <- tbbl %>%
-    filter(period_starts == index_date) %>%
+    filter(`Period Starting` == index_date) %>%
     pull(Value)
   tbbl <- tbbl %>%
     mutate(Value = 100 * Value / df_index_value) %>%
-    filter(period_starts > tsibble::yearmonth(today() - years(10))) %>%
-    select(period_starts, Series, Value, Source)
+    filter(`Period Starting` > today() - years(10)) %>%
+    select(`Period Starting`, Series, Value, Source)
 }
 # extracts the provincial totals from births and deaths dataframes----------------
 get_totals <- function(tbbl, year, label) {
@@ -43,10 +46,11 @@ get_totals <- function(tbbl, year, label) {
     as.data.frame() %>%
     rownames_to_column(var = "ref_date") %>%
     as_tibble()
-  colnames(tbbl) <- c("period_starts", "Value")
+  colnames(tbbl) <- c("Period Starting", "Value")
+ # browser()
   tbbl <- tbbl %>%
     mutate(
-      period_starts = tsibble::yearmonth(period_starts),
+      `Period Starting` = lubridate::ym(`Period Starting`),
       Value = str_replace_all(Value, ",", ""),
       Value = as.numeric(Value),
       Series = label
@@ -55,25 +59,33 @@ get_totals <- function(tbbl, year, label) {
 }
 # calculate percentage changes------------
 percent_change <- function(tbbl) {
-  time_increment <- tbbl %>%
-    group_by(Series) %>%
-    summarise(grp_mean = mean(period_starts - lag(period_starts), na.rm = TRUE)) %>%
-    ungroup() %>%
-    summarize(mean(grp_mean)) %>%
-    pull()
+  frequency_all_series <- tbbl%>%
+    group_by(Series)%>%
+    summarize(frequency=case_when(all(near(1, diff(`Period Starting`), tol=1))~"daily",
+                                  all(near(7, diff(`Period Starting`), tol=2))~"weekly",
+                                  all(near(30, diff(`Period Starting`), tol=3))~"monthly",
+                                  all(near(90, diff(`Period Starting`), tol=4))~"quarterly",
+                                  all(near(180, diff(`Period Starting`), tol=5))~"semi",
+                                  all(near(365, diff(`Period Starting`), tol=6))~"annual",
+    ))
+  assertthat::assert_that(length(unique(frequency_all_series$frequency))==1)
+  frequency <-frequency_all_series$frequency[[1]] 
   num_lags <- case_when(
-    time_increment == 1 ~ 12,
-    time_increment == 3 ~ 4,
-    time_increment == 12 ~ 1
+    frequency== "daily" ~ 365,
+    frequency== "weekly" ~ 52,
+    frequency== "monthly" ~ 12,
+    frequency== "quarterly" ~ 4,
+    frequency== "semi" ~ 2,
+    frequency== "annual" ~ 1,
   )
   tbbl <- tbbl %>%
     group_by(Series) %>%
-    arrange(period_starts) %>%
+    arrange(`Period Starting`) %>%
     mutate(
       `Change` = Value / lag(Value) - 1,
       `Annual Change` = Value / lag(Value, n = num_lags) - 1
     )
-  }
+}
 # Extractor function (retrieve cell)----------
 extract_cell <- function(tbbl, nm) {
   tbbl <- tbbl %>%
@@ -84,14 +96,14 @@ extract_cell <- function(tbbl, nm) {
   return(tbbl)
 }
 # plotly time series plot------------
-plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, spn) {
-  plt <- ggplot(tbbl, aes(period_starts,
+plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, spn, el = FALSE) {
+  plt <- ggplot(tbbl, aes(`Period Starting`,
                           {{ thing }},
                           colour = Series,
                           fill = Series,
                           group = Series,
                           text = paste(
-                            "\nIn", period_starts, tt_text, "\n", Series,
+                            "\nIn the period starting", `Period Starting`, tt_text, "\n", Series,
                             "was", format_as({{ thing }}, accuracy = .01)
                           )
   )) +
@@ -120,6 +132,10 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, 
   plt <- plt+
     labs(title=str_split(title,":")[[1]][1],
          x="")
+  if(el == TRUE){ 
+    plt <- plt + 
+      expand_limits(y=0)
+  }
   plotly::ggplotly(plt, tooltip = "text")
 }
 

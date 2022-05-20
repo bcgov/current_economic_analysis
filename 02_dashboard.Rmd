@@ -101,6 +101,8 @@ selectInput(
   multiple = FALSE
 )
 
+checkboxInput("include_origin", "Should plot include origin?", FALSE)
+
 reactive_df <- reactive({
   extract_cell(nested_dataframe, input$name)
 })
@@ -124,7 +126,8 @@ plotly::renderPlotly({
     input$type,
     input$pal,
     title=input$name,
-    spn = input$span
+    spn = input$span,
+    el = input$include_origin
   )
 }) %>%
   bindCache(
@@ -133,7 +136,8 @@ plotly::renderPlotly({
     input$theme, 
     input$type,
     input$pal,
-    input$span
+    input$span,
+    input$include_origin
   )
 renderUI({
   if(str_detect(reactive_df()$Source[1], "http")){
@@ -223,7 +227,6 @@ DT::renderDataTable(server = FALSE, {
   reactive_df() %>%
     select(-Source) %>%
     mutate(
-      period_starts = as.Date(period_starts),
       `Change` = scales::percent(`Change`, accuracy = .1),
       `Annual Change` = scales::percent(`Annual Change`, accuracy = .1)
     ) %>%
