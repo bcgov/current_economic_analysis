@@ -33,6 +33,7 @@ library(tidyverse)
 library(tsibble) # data includes a tsibble::yearquarter field
 library(lubridate) # years and months not exported by lubridate
 library(ggthemes)
+library(markdown)
 themes <- ls("package:ggplot2", pattern = "^theme_")
 themes <- themes[
   themes != "theme_get" &
