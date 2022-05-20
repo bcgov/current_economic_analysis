@@ -52,12 +52,12 @@ if(permit_file_exists & permit_file_young){
     janitor::clean_names()%>%
     mutate(
       Series = type_of_structure,
-      Month = tsibble::yearmonth(ref_date),
+      period_starts = tsibble::yearmonth(ref_date),
       Value = value * 1000,
       Source = paste("Statistics Canada. Table", cansim_id, "Building permits, by type of structure and type of work (x 1,000)")
     ) %>%
-    filter(Month > tsibble::yearmonth(lubridate::today() - lubridate::years(10)))%>%
-    select(Month, Series, Value, Source)
+    filter(period_starts > tsibble::yearmonth(lubridate::today() - lubridate::years(10)))%>%
+    select(period_starts, Series, Value, Source)
   saveRDS(building_permits, permit_file)
   df_list$`B.C. Monthly Building Permits` <- building_permits
   cansim::disconnect_cansim_sqlite(connection)
@@ -75,10 +75,10 @@ commodity <- read_csv(commodity_url,
   pivot_longer(cols = -date, names_to = "name", values_to = "Value")%>%
   left_join(commodity_names, by = c("name" = "id"))%>%
   select(-name)%>%
-  mutate(Month = tsibble::yearmonth(date),
+  mutate(period_starts = tsibble::yearmonth(date),
          Source = commodity_url)%>%
-  filter(Month > tsibble::yearmonth(today()-years(10)))%>%
-  select(Month, Series, Value, Source)
+  filter(period_starts > tsibble::yearmonth(today()-years(10)))%>%
+  select(period_starts, Series, Value, Source)
 df_list$`Canada Monthly Commodity Price Indicies: Jan 1972 = 100` <- commodity
 #Major Project Inventory (just most recent quarter)---------
 mpi_url_to_scrape <- "https://www2.gov.bc.ca/gov/content/employment-business/economic-development/industry/bc-major-projects-inventory/recent-reports"
@@ -140,11 +140,11 @@ df_list$`B.C. Monthly Insolvencies` <- insol%>%
   select(-file,-thing)%>%
   pivot_longer(cols = all_of(month.abb), names_to = "name", values_to = "Value")%>%
   unite("ref_date", name, year, sep="-")%>%
-  mutate(Month = tsibble::yearmonth(ref_date),
+  mutate(period_starts = tsibble::yearmonth(ref_date),
          Source = insol_url_to_scrape,
          Value = as.numeric(Value))%>%
-  filter(Month > tsibble::yearmonth(today()-years(10)))%>%
-  select(Month, Series, Value, Source)
+  filter(period_starts > tsibble::yearmonth(today()-years(10)))%>%
+  select(period_starts, Series, Value, Source)
 #S&P500--------
 df_list$`USA Monthly S&P 500: Mar 1957 = 44.03` <- quantmod::getSymbols("^GSPC",
                                                   from = today()-years(10),
@@ -152,8 +152,8 @@ df_list$`USA Monthly S&P 500: Mar 1957 = 44.03` <- quantmod::getSymbols("^GSPC",
                                                   auto.assign = FALSE)%>%
   broom::tidy()%>%
   filter(series == "GSPC.Close")%>%
-  mutate(Month = tsibble::yearmonth(index))%>%
-  group_by(Month)%>%
+  mutate(period_starts = tsibble::yearmonth(index))%>%
+  group_by(period_starts)%>%
   summarize(Value = mean(value))%>%
   mutate(Source = "https://ca.finance.yahoo.com/quote/%5EGSPC",
          Series = "GSPC.Close")
@@ -167,7 +167,7 @@ df_list$`Canada Monthly GDP Chained (2012) dollars` <- get_cansim_unfiltered("36
   filter(seasonal_adjustment == "Seasonally adjusted at annual rates",
         prices == "Chained (2012) dollars",
         north_american_industry_classification_system_naics == "All industries [T001]")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #non farm payroll ----------------
 nonfarm_url <- "https://data.bls.gov/pdq/SurveyOutputServlet?request_action=wh&graph_name=CE_cesbref1"
 nonfarm_html <- rvest::read_html(nonfarm_url)
@@ -177,10 +177,10 @@ df_list$`USA Monthly Non-farm Payroll: Employees` <- nonfarm[-nrow(nonfarm), -nc
   pivot_longer(cols = all_of(month.abb), names_to = "month", values_to = "value")%>%
   mutate(value = strex::str_extract_numbers(value),
          Value = as.numeric(value)* 1000,
-         Month = tsibble::yearmonth(paste(Year,month,sep="-")),
+         period_starts = tsibble::yearmonth(paste(Year,month,sep="-")),
          Series = "US non-farm payroll",
          Source = nonfarm_url)%>%
-  select(Month, Series, Value, Source)%>%
+  select(period_starts, Series, Value, Source)%>%
   na.omit()
 #interest rates and mortgage rates------------
 interest_rates<-get_cansim_unfiltered("10-10-0122",
@@ -190,12 +190,12 @@ interest_rates<-get_cansim_unfiltered("10-10-0122",
    filter(rates %in% c('Treasury bill auction - average yields: 3 month',
                       'Bank rate',
                       'Selected Government of Canada benchmark bond yields: 10 years'))%>%
-  select(Month, Series = rates, Value, Source)
+  select(period_starts, Series = rates, Value, Source)
 mortgage_rates <- get_cansim_unfiltered("34-10-0145",
                                         add_label = "5 year mortgage rate",
                                         source_text = "Canada Mortgage and Housing Corporation, conventional mortgage lending rate, 5-year term"
                                         )%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 df_list$`Canada Monthly interest rates/yields` <- bind_rows(interest_rates, mortgage_rates)%>%
   mutate(Source = paste(interest_rates$Source[1],mortgage_rates$Source[1], sep = " AND "))
 #CADUSD exchange_rate---------
@@ -206,16 +206,16 @@ exchange_rate1 <- get_cansim_unfiltered("33-10-0163",
                                        )%>%
   filter(type_of_currency == "U.S. dollar, monthly average")%>%
   mutate(Value = 1/Value)%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 exchange_rate2 <- get_cansim_unfiltered("10-10-0009",
                                         add_label = "CAD in USD",
                                         source_text = "Foreign exchange rates in Canadian dollars, Bank of Canada, monthly"
                                         )%>%
   filter(type_of_currency == "United States dollar, noon spot rate, average")%>%
   mutate(Value = 1/Value)%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 exchange_rate <- bind_rows(exchange_rate1, exchange_rate2)%>% #this includes overlap
-  group_by(Month, Series)%>% #note that we do NOT group by source, so source gets dropped.
+  group_by(period_starts, Series)%>% #note that we do NOT group by source, so source gets dropped.
   summarize(Value = mean(Value, na.rm = TRUE))%>% # this gets rid of overlap
   mutate(Source = paste(exchange_rate1$Source[1],exchange_rate2$Source[1], sep = " AND ")) # add the source back in.
 df_list$`USA Monthly Exchange Rate` <- exchange_rate
@@ -228,7 +228,7 @@ df_list$`B.C. Monthly International Merchandise Trade` <- get_cansim_unfiltered(
   filter(north_american_product_classification_system_napcs == "Total of all merchandise",
          principal_trading_partners == "All countries",
          geo == "British Columbia")%>%
-  select(Month, Series = trade, Value, Source)
+  select(period_starts, Series = trade, Value, Source)
 #tourist flows--------
 df_list$`B.C. Monthly Tourism` <- get_cansim_unfiltered("24-10-0043",
                                                 add_label = "",
@@ -238,7 +238,7 @@ df_list$`B.C. Monthly Tourism` <- get_cansim_unfiltered("24-10-0043",
         traveller_characteristics %in% c("Total non resident tourists",
                                           "Total Canadian tourists returning from abroad"),
         geo == "British Columbia")%>%
-  select(Month, Series = traveller_characteristics, Value, Source)
+  select(period_starts, Series = traveller_characteristics, Value, Source)
 #Natural Resource indicies---------
 # (normalized to index_date)
 # Natural gas (US data)
@@ -256,19 +256,19 @@ forestry <- forestry%>%
   as_tibble()%>%
   janitor::clean_names()%>%
   select(ref_date = d, value = m_fopr)%>%
-  mutate(Month = tsibble::yearmonth(ymd(ref_date)),
+  mutate(period_starts = tsibble::yearmonth(ymd(ref_date)),
          Value = as.numeric(unlist(value)),
          Series = "Forestry Index",
          Source = forestry_url)
 forestry_index_value <- forestry%>%
-  filter(Month == index_date)%>%
+  filter(period_starts == index_date)%>%
   pull(Value)
 forestry <- forestry%>%
 mutate(Value = 100*Value/forestry_index_value)%>%
-  filter(Month > tsibble::yearmonth(today()-years(10)))%>%
-  select(Month, Series, Value, Source)
+  filter(period_starts > tsibble::yearmonth(today()-years(10)))%>%
+  select(period_starts, Series, Value, Source)
 df_list$`Canada Monthly Forestry and Energy Indicies: Jan 2014 = 100` <- bind_rows(natural_gas, oil, forestry)%>%
-  arrange(Month)
+  arrange(period_starts)
 #manufacturing: sales ---------------
 df_list$`B.C. Monthly Manufacturing Sales` <- get_cansim_unfiltered("16-10-0048",
                                                             add_label = "Manufacturing Sales",
@@ -278,7 +278,7 @@ df_list$`B.C. Monthly Manufacturing Sales` <- get_cansim_unfiltered("16-10-0048"
   filter(seasonal_adjustment == "Seasonally adjusted",
          north_american_industry_classification_system_naics == "Manufacturing [31-33]",
          geo == "British Columbia")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #manufacturing: employment ---------------
 df_list$`B.C. Monthly Manufacturing Employment` <- get_cansim_unfiltered("14-10-0355",
                                                                  add_label = "Manufacturing Employment",
@@ -289,7 +289,7 @@ df_list$`B.C. Monthly Manufacturing Employment` <- get_cansim_unfiltered("14-10-
         data_type == "Seasonally adjusted",
         north_american_industry_classification_system_naics == "Manufacturing [31-33]",
         geo == "British Columbia")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 
 #housing starts------
 df_list$`B.C. Monthly Housing Starts`<- get_cansim_unfiltered("34-10-0158",
@@ -298,7 +298,7 @@ df_list$`B.C. Monthly Housing Starts`<- get_cansim_unfiltered("34-10-0158",
                                                       source_text = "Canada Mortgage and Housing Corporation, housing starts, all areas, Canada and provinces, seasonally adjusted at annual rates, monthly (x 1,000)"
                                                       )%>%
   filter(geo == "British Columbia")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #consumer price index---------
 df_list$`B.C. Monthly Consumer Price Index: April 2002 = 100`<- get_cansim_unfiltered("18-10-0004",
                                                             add_label = "BC consumer price index",
@@ -306,7 +306,7 @@ df_list$`B.C. Monthly Consumer Price Index: April 2002 = 100`<- get_cansim_unfil
                                                             )%>%
   filter(geo == "British Columbia",
          products_and_product_groups == "All-items")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #retail trade-------------
 df_list$`B.C. Monthly Retail Trade`<- get_cansim_unfiltered("20-10-0008",
                                                     add_label = "B.C. Retail Trade",
@@ -316,7 +316,7 @@ df_list$`B.C. Monthly Retail Trade`<- get_cansim_unfiltered("20-10-0008",
   filter(geo == "British Columbia",
         north_american_industry_classification_system_naics == "Retail trade [44-45]",
         adjustments == "Seasonally adjusted")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #food_and_drinking sales--------------
 df_list$`B.C. Monthly Food and Drink Sales` <- get_cansim_unfiltered("21-10-0019",
                                                            add_label = "BC food and drinking sales",
@@ -326,7 +326,7 @@ df_list$`B.C. Monthly Food and Drink Sales` <- get_cansim_unfiltered("21-10-0019
   filter(geo == "British Columbia",
         north_american_industry_classification_system_naics == "Total, food services and drinking places",
         seasonal_adjustment == "Seasonally adjusted")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #food and drinking employment-----------
 df_list$`B.C. Monthly Food and Drink Employment`<- get_cansim_unfiltered("14-10-0201",
                                                                 add_label = "B.C food and drinking employment",
@@ -335,7 +335,7 @@ df_list$`B.C. Monthly Food and Drink Employment`<- get_cansim_unfiltered("14-10-
   filter(geo == "British Columbia",
          north_american_industry_classification_system_naics == "Food services and drinking places [722]",
          type_of_employee == "All employees")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #business confidence------------
 guess_last_report_date <- format(today()-months(1), format="%Y-%m") #THIS COULD BREAK
 business_confidence_url <- paste0("https://content.cfib-fcei.ca/sites/default/files/",
@@ -360,13 +360,13 @@ value <- business_confidence[business_confidence$english == "British Columbia", 
   na.omit()%>%
   unlist()
 
-df_list$`B.C. Monthly CFIB Business Barometer Index`<- tibble(Month = date_column_names,
+df_list$`B.C. Monthly CFIB Business Barometer Index`<- tibble(period_starts = date_column_names,
                                 Series = "B.C. CFIB Business Barometer Index",
                                 value = value,
                                 Source = business_confidence_url)%>%
-  group_by(Month, Series, Source)%>%
+  group_by(period_starts, Series, Source)%>%
   summarize(Value = mean(value))%>% #THERE ARE SOME DUPLICATE MONTHS.... TAKE AVERAGE.
-  filter(Month > tsibble::yearmonth(today()-years(10)))
+  filter(period_starts > tsibble::yearmonth(today()-years(10)))
 #motor vehicle sales---------------
 df_list$`B.C. Monthly New Vehicle Sales`<- get_cansim_unfiltered("20-10-0001",
                                                                        add_label = "Units",
@@ -377,7 +377,7 @@ df_list$`B.C. Monthly New Vehicle Sales`<- get_cansim_unfiltered("20-10-0001",
         vehicle_type == "Total, new motor vehicles",
         origin_of_manufacture == "Total, country of manufacture",
         sales == "Units")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #lumber------------------
 df_list$`B.C. Monthly Total Softwood Production`<- get_cansim_unfiltered("16-10-0017",
                                                                  add_label = "B.C. Total Softwood Production",
@@ -386,7 +386,7 @@ df_list$`B.C. Monthly Total Softwood Production`<- get_cansim_unfiltered("16-10-
                                                                  )%>%
   filter(north_american_product_classification_system_napcs == "Total softwood, production [24112]",
          geo == "British Columbia")%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #yvr this requries manual intervention--------------
 # yvr <- "https://www.yvr.ca/en/about-yvr/facts-and-stats"
 # yvr_html <- read_html(yvr)
@@ -425,9 +425,9 @@ births <- tibble(url = paste0("https://www2.gov.bc.ca",
   select(-data)%>%
   unnest(just_the_totals)%>%
   select(-url, -year)%>%
-  arrange(Month)%>%
-  filter(Month < tsibble::yearmonth(today()-months(1)),
-        Month > tsibble::yearmonth(today()-years(10)))
+  arrange(period_starts)%>%
+  filter(period_starts < tsibble::yearmonth(today()-months(1)),
+        period_starts > tsibble::yearmonth(today()-years(10)))
 #deaths--------------
 deaths <- "https://www2.gov.bc.ca/gov/content/life-events/statistics-reports/deaths"
 deaths_html <- rvest::read_html(deaths)
@@ -446,16 +446,16 @@ deaths <- tibble(url = paste0("https://www2.gov.bc.ca",
   select(-data)%>%
   unnest(just_the_totals)%>%
   select(-url, -year)%>%
-  arrange(Month)%>%
-  filter(Month < tsibble::yearmonth(today()-months(1)),
-        Month > tsibble::yearmonth(today()-years(10)))
+  arrange(period_starts)%>%
+  filter(period_starts < tsibble::yearmonth(today()-months(1)),
+        period_starts > tsibble::yearmonth(today()-years(10)))
 
 df_list$`B.C. Monthly Births and Deaths` <- bind_rows(births, deaths)%>%
-  pivot_wider(id_cols = c("Month"),
+  pivot_wider(id_cols = c("period_starts"),
               names_from = Series, 
               values_from = Value)%>%
   mutate(`net difference` = births - deaths)%>%
-  pivot_longer(cols = -Month, names_to = "Series", values_to = "Value")%>%
+  pivot_longer(cols = -period_starts, names_to = "Series", values_to = "Value")%>%
   mutate(Source="https://www2.gov.bc.ca/gov/content/life-events/statistics-reports")
 
 #interprovincial migration------------
@@ -464,20 +464,20 @@ df_list$`B.C. Quarterly Interprovincial Migration`<- get_cansim_unfiltered("17-1
                               source_text = "Estimates of the components of interprovincial migration, quarterly"
 )%>%
   filter(geo == "British Columbia")%>%
-  select(Month, Value, Series = interprovincial_migration, Source)%>%
-  pivot_wider(id_cols = c(Month,Source), names_from = Series, values_from = Value)%>%
+  select(period_starts, Value, Series = interprovincial_migration, Source)%>%
+  pivot_wider(id_cols = c(period_starts,Source), names_from = Series, values_from = Value)%>%
   mutate(`Net inter-provincial in-migration`=`In-migrants`-`Out-migrants`)%>%
-  pivot_longer(cols=-c(Month,Source), names_to = "Series", values_to = "Value")
+  pivot_longer(cols=-c(period_starts,Source), names_to = "Series", values_to = "Value")
 #international migration---------------
 df_list$`B.C. Quarterly International Migration` <- get_cansim_unfiltered("17-10-0040",
                               add_label = "",
                               source_text = "Estimates of the components of international migration, quarterly"
 )%>%
   filter(geo == "British Columbia")%>%
-  select(Month, Value, Series = components_of_population_growth, Source)%>%
-  pivot_wider(id_cols = c(Month,Source), names_from = Series, values_from = Value)%>%
+  select(period_starts, Value, Series = components_of_population_growth, Source)%>%
+  pivot_wider(id_cols = c(period_starts,Source), names_from = Series, values_from = Value)%>%
   mutate(`Net international in-migration`=Immigrants+`Net non-permanent residents`-Emigrants-`Net temporary emigrants`+`Returning emigrants`)%>%
-  pivot_longer(cols=-c(Month,Source), names_to = "Series", values_to = "Value")
+  pivot_longer(cols=-c(period_starts,Source), names_to = "Series", values_to = "Value")
 # experimental economic activity index-----------
 df_list$`B.C. Monthly Economic Activity Index` <- get_cansim_unfiltered("36-10-0633-01",
                       add_label = "Simple economic activity index",
@@ -486,7 +486,7 @@ df_list$`B.C. Monthly Economic Activity Index` <- get_cansim_unfiltered("36-10-0
   filter(geo=="British Columbia",
          activity_index=="Simple economic activity index"
   )%>%
-  select(Month, Series, Value, Source)
+  select(period_starts, Series, Value, Source)
 #nest the data to calculate changes----------
 nested_dataframe <- enframe(df_list)%>%
   mutate(value=map(value, percent_change))

@@ -5,11 +5,11 @@ get_cansim_unfiltered <- function(cansim_id, add_label, multiply_value_by = 1, s
     mutate(
       geo=str_trim(geo),
       Series = add_label,
-      Month = tsibble::yearmonth(ref_date),
+      period_starts = tsibble::yearmonth(ref_date),
       Value = value * multiply_value_by,
       Source = paste("Statistics Canada. Table", cansim_id, source_text, sep=" ")
     ) %>%
-    filter(Month > tsibble::yearmonth(today() - years(10)))
+    filter(period_starts > tsibble::yearmonth(today() - years(10)))
 }
 # convert JSON data to tibble------------
 df_from_JSON <- function(url, add_label, index_date) {
@@ -19,18 +19,18 @@ df_from_JSON <- function(url, add_label, index_date) {
   colnames(tbbl) <- c("ref_date", "value")
   tbbl <- tbbl %>%
     mutate(
-      Month = tsibble::yearmonth(paste0(substring(ref_date, 1, 4), "-", substring(ref_date, 5, 6))),
+      period_starts = tsibble::yearmonth(paste0(substring(ref_date, 1, 4), "-", substring(ref_date, 5, 6))),
       Series = add_label,
       Value = as.numeric(value),
       Source = url
     )
   df_index_value <- tbbl %>%
-    filter(Month == index_date) %>%
+    filter(period_starts == index_date) %>%
     pull(Value)
   tbbl <- tbbl %>%
     mutate(Value = 100 * Value / df_index_value) %>%
-    filter(Month > tsibble::yearmonth(today() - years(10))) %>%
-    select(Month, Series, Value, Source)
+    filter(period_starts > tsibble::yearmonth(today() - years(10))) %>%
+    select(period_starts, Series, Value, Source)
 }
 # extracts the provincial totals from births and deaths dataframes----------------
 get_totals <- function(tbbl, year, label) {
@@ -43,10 +43,10 @@ get_totals <- function(tbbl, year, label) {
     as.data.frame() %>%
     rownames_to_column(var = "ref_date") %>%
     as_tibble()
-  colnames(tbbl) <- c("Month", "Value")
+  colnames(tbbl) <- c("period_starts", "Value")
   tbbl <- tbbl %>%
     mutate(
-      Month = tsibble::yearmonth(Month),
+      period_starts = tsibble::yearmonth(period_starts),
       Value = str_replace_all(Value, ",", ""),
       Value = as.numeric(Value),
       Series = label
@@ -57,7 +57,7 @@ get_totals <- function(tbbl, year, label) {
 percent_change <- function(tbbl) {
   time_increment <- tbbl %>%
     group_by(Series) %>%
-    summarise(grp_mean = mean(Month - lag(Month), na.rm = TRUE)) %>%
+    summarise(grp_mean = mean(period_starts - lag(period_starts), na.rm = TRUE)) %>%
     ungroup() %>%
     summarize(mean(grp_mean)) %>%
     pull()
@@ -68,7 +68,7 @@ percent_change <- function(tbbl) {
   )
   tbbl <- tbbl %>%
     group_by(Series) %>%
-    arrange(Month) %>%
+    arrange(period_starts) %>%
     mutate(
       `Change` = Value / lag(Value) - 1,
       `Annual Change` = Value / lag(Value, n = num_lags) - 1
@@ -85,13 +85,13 @@ extract_cell <- function(tbbl, nm) {
 }
 # plotly time series plot------------
 plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, spn) {
-  plt <- ggplot(tbbl, aes(Month,
+  plt <- ggplot(tbbl, aes(period_starts,
                           {{ thing }},
                           colour = Series,
                           fill = Series,
                           group = Series,
                           text = paste(
-                            "\nIn", Month, tt_text, "\n", Series,
+                            "\nIn", period_starts, tt_text, "\n", Series,
                             "was", format_as({{ thing }}, accuracy = .01)
                           )
   )) +

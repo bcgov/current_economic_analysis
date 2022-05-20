@@ -223,7 +223,7 @@ DT::renderDataTable(server = FALSE, {
   reactive_df() %>%
     select(-Source) %>%
     mutate(
-      Month = as.Date(Month),
+      period_starts = as.Date(period_starts),
       `Change` = scales::percent(`Change`, accuracy = .1),
       `Annual Change` = scales::percent(`Annual Change`, accuracy = .1)
     ) %>%
