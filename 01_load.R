@@ -180,7 +180,8 @@ df_list$`USA Monthly Non-farm Payroll: Employees` <- nonfarm[-nrow(nonfarm), -nc
          Month = tsibble::yearmonth(paste(Year,month,sep="-")),
          Series = "US non-farm payroll",
          Source = nonfarm_url)%>%
-  select(Month, Series, Value, Source)
+  select(Month, Series, Value, Source)%>%
+  na.omit()
 #interest rates and mortgage rates------------
 interest_rates<-get_cansim_unfiltered("10-10-0122",
                                       add_label = "",

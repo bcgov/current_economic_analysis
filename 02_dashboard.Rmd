@@ -12,6 +12,7 @@ resource_files:
 - processed_data/mpi.rds
 - processed_data/nested_dataframe.rds
 - R/functions.R
+- commentary/commentary.md
 ---
   
 ```{r global, include=FALSE}
@@ -45,6 +46,7 @@ nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds")
 mpi <- readRDS(here::here("processed_data", "mpi.rds")) %>%
   filter(last_update > today() - years(5)) # a single project had a last_update value of 2016?
 source(here::here("R","functions.R"))
+commentary_file <- here::here("commentary", "commentary.md")
 ```
 
 
@@ -362,7 +364,7 @@ Commentary:
 ### Commentary
 
 ```{r}
-  includeMarkdown(here::here("commentary", "commentary.md"))
+  includeMarkdown(commentary_file)
 ```
 
 
