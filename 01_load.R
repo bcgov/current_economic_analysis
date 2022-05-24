@@ -144,6 +144,7 @@ df_list$`B.C. Monthly Insolvencies` <- insol%>%
          Source = insol_url_to_scrape,
          Value = as.numeric(Value))%>%
   filter(`Period Starting` > today()-years(10))%>%
+  na.omit()%>%
   select(`Period Starting`, Series, Value, Source)
 #S&P500--------
 df_list$`USA Monthly S&P 500: Mar 1957 = 44.03` <- quantmod::getSymbols("^GSPC",
@@ -159,6 +160,7 @@ df_list$`USA Monthly S&P 500: Mar 1957 = 44.03` <- quantmod::getSymbols("^GSPC",
         Source = "https://ca.finance.yahoo.com/quote/%5EGSPC",
         Series = "GSPC.Close"
         )%>%
+  filter(`Period Starting` > today()-years(10))%>%
   select(-Month)
 
 #GDP_canada----------
@@ -183,7 +185,9 @@ df_list$`USA Monthly Non-farm Payroll: Employees` <- nonfarm[-nrow(nonfarm), -nc
          `Period Starting` = lubridate::ym(paste(Year, month,sep="-")),
          Series = "US non-farm payroll",
          Source = nonfarm_url)%>%
+  arrange(`Period Starting`)%>%
   select(`Period Starting`, Series, Value, Source)%>%
+  filter(`Period Starting` > today()-years(10))%>%
   na.omit()
 #interest rates and mortgage rates------------
 interest_rates<-get_cansim_unfiltered("10-10-0122",
@@ -500,27 +504,28 @@ df_list$`B.C. Weekly Local Business Condition Index: Aug 2020=100`<-get_cansim_u
   mutate(ref_date=lubridate::ymd(ref_date))%>%
   select(`Period Starting` = ref_date, Series = geo, Value=value, Source=source)
 
-#nest the data to calculate changes----------
+#nest the data to calculate some statistics----------
 nested_dataframe <- enframe(df_list)%>%
-  mutate(value=map(value, percent_change))
-#unnest the data----------
-ts_df <- nested_dataframe%>%
-  unnest(cols = c(value))
-#optionally add commentary----------
-# commentary <- ts_df%>%
-#   ungroup()%>%
-#   select(name, Series)%>%
-#   distinct()%>%
-#   mutate(commentary="")%>%
-#   as.data.frame()
-# commentary <- editData::editData(commentary)
-# 
-# ts_df <- full_join(ts_df, commentary)
+  mutate(value=map(value, make_stats))
+
+monthly <- nested_dataframe%>%
+  filter(str_detect(name, "Monthly"))
+
+long <- monthly%>%
+  mutate(measure =map(value, function(x) x %>% select(`Period Starting`, Binning, Rescaling)))%>%
+  select(-value)%>%
+  unnest(measure)%>%
+  unite(longname, name, Series, sep=": ")%>%
+  arrange(`Period Starting`)%>%
+  filter(`Period Starting` > today()-years(10))
+
 
 #save the data-----------
 write_rds(nested_dataframe, here::here("processed_data", "nested_dataframe.rds"))
-write_rds(ts_df, here::here("processed_data", "ts_df.rds"))
 write_rds(mpi, here::here("processed_data", "mpi.rds"))
+write_rds(long, here::here("processed_data", "long.rds"))
+
+
 
 
 

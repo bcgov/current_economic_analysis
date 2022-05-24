@@ -13,6 +13,7 @@ resource_files:
 - processed_data/nested_dataframe.rds
 - R/functions.R
 - commentary/commentary.md
+- processed_data/long.rds
 ---
   
 ```{r global, include=FALSE}
@@ -44,6 +45,7 @@ themes <- themes[
 themes <- c(themes, ls("package:ggthemes", pattern = "^theme_"))
 # load objects----------
 nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds"))
+long <- readRDS(here::here("processed_data", "long.rds"))
 mpi <- readRDS(here::here("processed_data", "mpi.rds")) %>%
   filter(last_update > today() - years(5)) # a single project had a last_update value of 2016?
 source(here::here("R","functions.R"))
@@ -51,7 +53,7 @@ commentary_file <- here::here("commentary", "commentary.md")
 ```
 
 
-Time Series:
+Individual Time Series:
 =====================================  
  
  Inputs {.sidebar}
@@ -260,6 +262,57 @@ renderUI({
 })
 ```
 
+All monthly series: 
+===================================== 
+
+
+ Inputs {.sidebar data-width=325}
+-------------------------------------
+
+<br>
+
+*  The levels of the time series differ by several orders of magnitude. 
+*  Levels can also be close to zero implying that growth rates can also vary by several orders of magnitude.
+*  Two data normalizations are considered:
+    -  Binning: values $v$ are replaced by their (within series) percentile score.
+    -  Rescaling: values are replaced by $(v-\min(v))/(\max(v)-\min(v))$
+
+
+```{r}
+selectInput("norm",
+  label = "Choose a data normalization:",
+  choices = c("Binning","Rescaling"),
+  selected = "Rescaling"
+)
+
+wide <- reactive({
+  long %>%
+    select(longname, `Period Starting`, input$norm)%>%
+    pivot_wider(id_cols = longname, names_from = "Period Starting", values_from = input$norm)%>%
+    column_to_rownames(var="longname")
+})
+```
+
+
+
+Column 
+-----------------------------------------------------------------------
+
+### 
+
+```{r}
+renderPlot({
+ pheatmap::pheatmap(wide(),
+         cluster_cols=FALSE,
+         angle_col=0,
+         main = str_to_title(paste("Monthly data, normalized by", input$norm)),
+         col=viridisLite::viridis(100),
+         labels_col=if_else(lubridate::month(lubridate::ymd(colnames(wide())))==1,
+                            as.character(lubridate::year(lubridate::ymd(colnames(wide())))),
+                                            "")) 
+})
+```
+
 Major Project Inventory: 
 =====================================     
 
@@ -361,16 +414,6 @@ DT::renderDataTable(server = FALSE, {
 }) %>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
-
-Commentary: 
-===================================== 
-
-### Commentary
-
-```{r}
-  includeMarkdown(commentary_file)
-```
-
 
 
 

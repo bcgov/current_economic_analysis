@@ -57,18 +57,18 @@ get_totals <- function(tbbl, year, label) {
     )
   return(tbbl)
 }
-# calculate percentage changes------------
-percent_change <- function(tbbl) {
+# calculate some stats------------
+make_stats <- function(tbbl) {
   frequency_all_series <- tbbl%>%
     group_by(Series)%>%
     summarize(frequency=case_when(all(near(1, diff(`Period Starting`), tol=1))~"daily",
                                   all(near(7, diff(`Period Starting`), tol=2))~"weekly",
-                                  all(near(30, diff(`Period Starting`), tol=3))~"monthly",
-                                  all(near(90, diff(`Period Starting`), tol=4))~"quarterly",
-                                  all(near(180, diff(`Period Starting`), tol=5))~"semi",
-                                  all(near(365, diff(`Period Starting`), tol=6))~"annual",
+                                  all(near(30.4375, diff(`Period Starting`), tol=3))~"monthly",
+                                  all(near(91.3125, diff(`Period Starting`), tol=3))~"quarterly",
+                                  all(near(182.625, diff(`Period Starting`), tol=2))~"semi",
+                                  all(near(365.25, diff(`Period Starting`), tol=1))~"annual",
     ))
-  assertthat::assert_that(length(unique(frequency_all_series$frequency))==1)
+  assertthat::assert_that(length(unique(frequency_all_series$frequency))==1)#make sure time series are (pretty much) regular.
   frequency <-frequency_all_series$frequency[[1]] 
   num_lags <- case_when(
     frequency== "daily" ~ 365,
@@ -83,7 +83,9 @@ percent_change <- function(tbbl) {
     arrange(`Period Starting`) %>%
     mutate(
       `Change` = Value / lag(Value) - 1,
-      `Annual Change` = Value / lag(Value, n = num_lags) - 1
+      `Annual Change` = Value / lag(Value, n = num_lags) - 1,
+      `Binning`= ntile(Value, 100),
+      `Rescaling`=range01(Value, na.rm=TRUE)
     )
 }
 # Extractor function (retrieve cell)----------
@@ -139,7 +141,6 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, 
   plotly::ggplotly(plt, tooltip = "text")
 }
 
-
-
-
+range01 <- function(x, ...)
+  {(x - min(x, ...)) / (max(x, ...) - min(x, ...))}
 
