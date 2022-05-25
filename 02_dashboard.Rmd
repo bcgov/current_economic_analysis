@@ -61,8 +61,8 @@ Individual Time Series:
 
 <br>
 
-- This dashboard retrieves `r dim(nested_dataframe)[1]` time series pertinent to British Columbia's current economic outlook. 
-- The data is updated nightly.
+- This dashboard provides time series pertinent to British Columbia's current economic outlook.
+- The data is updated nightly (with the exception of building permits: weekly)
 
 
 ```{r}

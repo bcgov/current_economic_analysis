@@ -105,7 +105,7 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, 
                           fill = Series,
                           group = Series,
                           text = paste(
-                            "\nIn the period starting", `Period Starting`, tt_text, "\n", Series,
+                            "\nIn", format.Date(`Period Starting`, "%B %Y"), tt_text, "\n", Series,
                             "was", format_as({{ thing }}, accuracy = .01)
                           )
   )) +
