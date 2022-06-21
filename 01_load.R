@@ -26,6 +26,23 @@ options("getSymbols.yahoo.warning" = FALSE)
 #constants---------
 index_date <- ymd("2014-01-01")# date for indexing forestry, oil, natural gas
 df_list <- list() #storage list for all dataframes
+#BC labour market info---------
+temp <- get_cansim_unfiltered("14-10-0287-03",
+                              add_label ="",
+                              source_text="Labour force characteristics by province, monthly, seasonally adjusted")%>%
+  filter(geo=="British Columbia",
+         sex=="Both sexes",
+         age_group=="15 years and over",
+         statistics=="Estimate",
+         data_type=="Seasonally adjusted")%>%
+  dplyr::select(`Period Starting`,
+                Series=labour_force_characteristics,
+                Value=val_norm,
+                Source)
+df_list$`B.C. Monthly Labour Market Rates` <- temp%>%
+  filter(str_detect(Series,"rate"))
+df_list$`B.C. Monthly Labour Market Levels` <- temp%>%
+  filter(!str_detect(Series,"rate"))
 #building permits HUGE file... only download once per week.-----
 permit_file <- here::here("processed_data","building_permits.rds")
 permit_file_exists <- file.exists(permit_file)
@@ -80,13 +97,13 @@ commodity <- read_csv(commodity_url,
   filter(`Period Starting` > today()-years(10))%>%
   select(`Period Starting`, Series, Value, Source)
 df_list$`Canada Monthly Commodity Price Indicies: Jan 1972 = 100` <- commodity
-#Major Project Inventory (just most recent quarter)---------
+#Major Project Inventory---------
 mpi_url_to_scrape <- "https://www2.gov.bc.ca/gov/content/employment-business/economic-development/industry/bc-major-projects-inventory/recent-reports"
 mpi_scraped <- rvest::read_html(mpi_url_to_scrape)
 mpi_links <- rvest::html_attr(rvest::html_nodes(mpi_scraped, "a"), "href") #all the links
 mpi_links <- mpi_links[mpi_links%>%startsWith("/assets/") & mpi_links%>%endsWith(".xlsx")]%>% #stubs of the links we want.
   na.omit()%>%
-  head(n = 1)
+  head(n = 1) #(just most recent quarter)
 mpi_links <- paste0("https://www2.gov.bc.ca", mpi_links) #paste the head onto the stubs
 mpi_files <- str_sub(mpi_links, start = -24) #names for the files
 mapply(download.file, mpi_links, here::here("raw_data", mpi_files)) #downloads all the mpi files into folder raw_data
@@ -106,7 +123,7 @@ mpi <- data.table::rbindlist(mpi_nested$data, use.names=FALSE)%>%
          first_entry_date,
          last_update)%>%
   mutate(source=mpi_url_to_scrape)%>%
-  arrange(last_update)
+  filter(last_update==max(last_update)) #file has 3 records where last update non consistent..
 
 #insolvencies---------
 #THIS COULD EASILY BREAK... terrible file structure
@@ -192,6 +209,7 @@ df_list$`USA Monthly Non-farm Payroll: Employees` <- nonfarm[-nrow(nonfarm), -nc
 #interest rates and mortgage rates------------
 interest_rates<-get_cansim_unfiltered("10-10-0122",
                                       add_label = "",
+                                      multiply_value_by = .01,
                                       source_text = "Financial market statistics, last Wednesday unless otherwise stated, Bank of Canada"
                                       )%>%
    filter(rates %in% c('Treasury bill auction - average yields: 3 month',
@@ -200,6 +218,7 @@ interest_rates<-get_cansim_unfiltered("10-10-0122",
   select(`Period Starting`, Series = rates, Value, Source)
 mortgage_rates <- get_cansim_unfiltered("34-10-0145",
                                         add_label = "5 year mortgage rate",
+                                        multiply_value_by = .01,
                                         source_text = "Canada Mortgage and Housing Corporation, conventional mortgage lending rate, 5-year term"
                                         )%>%
   select(`Period Starting`, Series, Value, Source)
@@ -237,15 +256,23 @@ df_list$`B.C. Monthly International Merchandise Trade` <- get_cansim_unfiltered(
          geo == "British Columbia")%>%
   select(`Period Starting`, Series = trade, Value, Source)
 #tourist flows--------
-df_list$`B.C. Monthly Tourism` <- get_cansim_unfiltered("24-10-0043",
-                                                add_label = "",
-                                                source_text = "International tourists entering or returning to Canada, by province of entry"
-                                                )%>%
-  filter(seasonal_adjustment == "Seasonally adjusted",
-        traveller_characteristics %in% c("Total non resident tourists",
-                                          "Total Canadian tourists returning from abroad"),
-        geo == "British Columbia")%>%
-  select(`Period Starting`, Series = traveller_characteristics, Value, Source)
+df_list$`B.C. Monthly Non-resident visitors` <- get_cansim_unfiltered("24-10-0050-01",
+                            add_label = "", 
+                            source_text = "Non-resident visitors entering Canada, by country of residence")%>%
+  filter(geo=="British Columbia", 
+         country_of_residence=="Non-resident visitors entering Canada"
+         )%>%
+  select(`Period Starting`, Series=country_of_residence, Value, Source)
+
+# df_list$`B.C. Monthly Tourism` <- get_cansim_unfiltered("24-10-0043",
+#                                                 add_label = "",
+#                                                 source_text = "International tourists entering or returning to Canada, by province of entry"
+#                                                 )%>%
+#   filter(seasonal_adjustment == "Seasonally adjusted",
+#         traveller_characteristics %in% c("Total non resident tourists",
+#                                           "Total Canadian tourists returning from abroad"),
+#         geo == "British Columbia")%>%
+#   select(`Period Starting`, Series = traveller_characteristics, Value, Source)
 #Natural Resource indicies---------
 # (normalized to index_date)
 # Natural gas (US data)
@@ -504,29 +531,89 @@ df_list$`B.C. Weekly Local Business Condition Index: Aug 2020=100`<-get_cansim_u
   mutate(ref_date=lubridate::ymd(ref_date))%>%
   select(`Period Starting` = ref_date, Series = geo, Value=value, Source=source)
 
+
+temp <- get_cansim_unfiltered("14-10-0201-01",
+                              add_label ="",
+                              source_text="Employment by industry, monthly, unadjusted for seasonality")
+
+
+
 #nest the data to calculate some statistics----------
 nested_dataframe <- enframe(df_list)%>%
   mutate(value=map(value, make_stats))
-
-monthly <- nested_dataframe%>%
-  filter(str_detect(name, "Monthly"))
-
-long <- monthly%>%
-  mutate(measure =map(value, function(x) x %>% select(`Period Starting`, Binning, Rescaling)))%>%
+#prepare data for heatmap----------
+for_heatmap <- nested_dataframe%>%
+  filter(str_detect(name, "Monthly"))%>%
+  mutate(measure =map(value, function(x) x %>% select(`Period Starting`, 
+                                                      `Binned Level`, 
+                                                      `Rescaled Level`,
+                                                      `Binned Change`,
+                                                      `Rescaled Change`,
+                                                      `Binned Annual Change`,
+                                                      `Rescaled Annual Change`
+                                                      )))%>%
   select(-value)%>%
   unnest(measure)%>%
   unite(longname, name, Series, sep=": ")%>%
   arrange(`Period Starting`)%>%
   filter(`Period Starting` > today()-years(10))
 
+#notable recent MONTHLY levels-------------
+low <- for_heatmap%>%
+  group_by(longname)%>%
+  filter(`Period Starting`==max(`Period Starting`))%>%
+  select(`Period Starting`, `Rescaled Level`)%>%
+  ungroup()%>%
+  slice_min(`Rescaled Level`, n = 5)%>%
+  mutate(relatively="low")
+
+high <- for_heatmap%>%
+  group_by(longname)%>%
+  filter(`Period Starting`==max(`Period Starting`))%>%
+  select(`Period Starting`, `Rescaled Level`)%>%
+  ungroup()%>%
+  slice_max(`Rescaled Level`, n = 5)%>%
+  mutate(relatively="high")
+
+notables <- bind_rows(high, low)
+
+#prepare data for for up down page------------
+for_up_down <- nested_dataframe%>%
+  unnest(value)%>%
+  group_by(name)%>%
+  filter(`Period Starting`==max(`Period Starting`))%>%
+  select(name, Series, `Period Starting`, Value, Change, `Annual Change`)%>%
+  unite(Name, name, Series, sep=": ")%>%
+  arrange(desc(Name))
+
+commentary <- notables%>%
+  left_join(for_up_down, by=c("longname"="Name","Period Starting"="Period Starting"))%>%
+  arrange(relatively, longname)%>%
+  mutate(commentary=paste("<b>",
+                          longname,
+                          "</b>=",
+                          if_else(str_detect(longname,"rate"), 
+                                  scales::percent(Value, accuracy = .1), 
+                                  scales::comma(Value, accuracy = 1)),
+                          "in the month starting",
+                          `Period Starting`,
+                          if_else(Change>0,"up","down"),
+                          scales::percent(abs(Change), accuracy = .1),
+                          "from the previous month and",
+                          if_else(`Annual Change`>0,"up","down"),
+                          scales::percent(abs(`Annual Change`), accuracy = .1),
+                          "from the previous year."), sep=" ")%>%
+  ungroup()%>%
+  select(relatively, commentary)
+
 
 #save the data-----------
+print(paste("using data from ", dim(nested_dataframe)[1], "sources"))
+write_rds(commentary, here::here("processed_data", "commentary.rds"))
+write_rds(for_up_down, here::here("processed_data", "for_up_down.rds"))
 write_rds(nested_dataframe, here::here("processed_data", "nested_dataframe.rds"))
 write_rds(mpi, here::here("processed_data", "mpi.rds"))
-write_rds(long, here::here("processed_data", "long.rds"))
-
-
-
+write_rds(for_heatmap, here::here("processed_data", "for_heatmap.rds"))
 
 
 

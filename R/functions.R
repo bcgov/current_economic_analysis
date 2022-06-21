@@ -82,10 +82,14 @@ make_stats <- function(tbbl) {
     group_by(Series) %>%
     arrange(`Period Starting`) %>%
     mutate(
-      `Change` = Value / lag(Value) - 1,
-      `Annual Change` = Value / lag(Value, n = num_lags) - 1,
-      `Binning`= ntile(Value, 100),
-      `Rescaling`=range01(Value, na.rm=TRUE)
+      `Change` = (Value - lag(Value))/abs(lag(Value)),
+      `Annual Change` = (Value - lag(Value, n = num_lags))/abs(lag(Value, n = num_lags)),
+      `Binned Level`= ntile(Value, 100),
+      `Rescaled Level`=range01(Value, na.rm=TRUE),
+      `Binned Change`= ntile(Change, 100),
+      `Rescaled Change`=range01(Change, na.rm=TRUE),
+      `Binned Annual Change`= ntile(`Annual Change`, 100),
+      `Rescaled Annual Change`=range01(`Annual Change`, na.rm=TRUE)
     )
 }
 # Extractor function (retrieve cell)----------
@@ -98,7 +102,13 @@ extract_cell <- function(tbbl, nm) {
   return(tbbl)
 }
 # plotly time series plot------------
-plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, spn, el = FALSE) {
+plotly_ts <- function(tbbl, thing,format_as, tt_text, theme, type, pal, title, spn, el = FALSE) {
+  
+  # format_as <- case_when(str_detect(tt_text,"change") ~ scales::percent,
+  #                        str_detect(title, "rates") ~ scales::percent,
+  #                        TRUE ~ scales::comma
+  #                        )
+  # browser()
   plt <- ggplot(tbbl, aes(`Period Starting`,
                           {{ thing }},
                           colour = Series,

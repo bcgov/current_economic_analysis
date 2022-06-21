@@ -13,9 +13,11 @@ resource_files:
 - processed_data/nested_dataframe.rds
 - R/functions.R
 - commentary/commentary.md
-- processed_data/long.rds
+- processed_data/for_heatmap.rds
+- processed_data/for_up_down.rds
+- processed_data/commentary.rds
 ---
-  
+
 ```{r global, include=FALSE}
 # Copyright 2022 Province of British Columbia
 #
@@ -35,35 +37,122 @@ library(tsibble) # data includes a tsibble::yearquarter field
 library(lubridate) # years and months not exported by lubridate
 library(ggthemes)
 library(markdown)
+library(formattable)
 themes <- ls("package:ggplot2", pattern = "^theme_")
 themes <- themes[
   themes != "theme_get" &
-  themes != "theme_set" &
-  themes != "theme_replace" &
-  themes != "theme_test" &
-  themes != "theme_update"]
+    themes != "theme_set" &
+    themes != "theme_replace" &
+    themes != "theme_test" &
+    themes != "theme_update"
+]
 themes <- c(themes, ls("package:ggthemes", pattern = "^theme_"))
 # load objects----------
+commentary <- readRDS(here::here("processed_data", "commentary.rds"))
 nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds"))
-long <- readRDS(here::here("processed_data", "long.rds"))
+for_heatmap <- readRDS(here::here("processed_data", "for_heatmap.rds"))
+for_up_down <- readRDS(here::here("processed_data", "for_up_down.rds"))
 mpi <- readRDS(here::here("processed_data", "mpi.rds")) %>%
   filter(last_update > today() - years(5)) # a single project had a last_update value of 2016?
-source(here::here("R","functions.R"))
-commentary_file <- here::here("commentary", "commentary.md")
+source(here::here("R", "functions.R"))
+
 ```
 
+# Notable Series:
 
-Individual Time Series:
-=====================================  
- 
- Inputs {.sidebar}
--------------------------------------
+## Inputs {.sidebar}
+
+<br><br>
+
+-   This dashboard retrieves time series pertinent to British Columbia's current economic outlook from `r dim(nested_dataframe)[1]` sources.
+-   The data is updated nightly (with the exception of building permits: weekly)
 
 <br>
 
-- This dashboard provides time series pertinent to British Columbia's current economic outlook.
-- The data is updated nightly (with the exception of building permits: weekly)
+## Column
 
+<br><br>
+
+**Notably High:**
+
+```{r, results='asis'}
+cat(paste("*", 
+          commentary%>%
+            filter(relatively=="high")%>%
+            pull()), 
+    sep = "\n")
+```
+
+**Notably Low:**
+
+```{r, results='asis'}
+cat(paste("*", 
+          commentary%>%
+            filter(relatively=="low")%>%
+            pull()),
+    sep = "\n")
+```
+
+# Most recent changes:
+
+## Inputs {.sidebar}
+
+<br><br>
+
+
+```{r}
+sliderInput("change_thres", "Changes smaller than this in grey.",
+  min = 0, max = 100, value = 5, post = "%"
+)
+sliderInput("annual_change_thres", "Annual changes smaller than this in grey.",
+  min = 0, max = 100, value = 50, post = "%"
+)
+
+```
+
+## Column
+
+```{r}
+change_thres <- .1
+annual_change_thres <- .1
+renderFormattable({
+  formattable(for_up_down, 
+              align=c("l","r","r","c","c"),
+              list(
+    Value = formatter("span", x ~ comma(x, digits = 2)),
+    Change = formatter("span",
+      style = x ~ style(color = case_when(
+        x + input$change_thres / 100 < 0 ~ "red",
+        x - input$change_thres / 100 > 0 ~ "green",
+        TRUE ~ "gainsboro"
+      )),
+      x ~ icontext(case_when(
+        x + input$change_thres / 100 < 0 ~ "arrow-down",
+        x - input$change_thres / 100 > 0 ~ "arrow-up",
+        TRUE ~ "arrow-right"
+      ))
+    ),
+    `Annual Change` = formatter(
+      "span",
+      style = x ~ style(color = case_when(
+        x + input$annual_change_thres / 100 < 0 ~ "red",
+        x - input$annual_change_thres / 100 > 0 ~ "green",
+        TRUE ~ "gainsboro"
+      )),
+      x ~ icontext(case_when(
+        x + input$annual_change_thres / 100 < 0 ~ "arrow-down",
+        x - input$annual_change_thres / 100 > 0 ~ "arrow-up",
+        TRUE ~ "arrow-right"
+      ))
+    )
+  ))
+})
+```
+
+# Individual Time Series:
+
+## Inputs {.sidebar}
+<br><br>
 
 ```{r}
 selectInput("name",
@@ -79,13 +168,14 @@ selectInput(
   multiple = FALSE
 )
 conditionalPanel(
-          condition = "input.type == 'smooth'",
-          sliderInput(
-  "span",
-  "how smooth?",
-  .1,
-  .9,
-  .5)
+  condition = "input.type == 'smooth'",
+  sliderInput(
+    "span",
+    "how smooth?",
+    .1,
+    .9,
+    .5
+  )
 )
 selectInput(
   "theme",
@@ -110,12 +200,11 @@ reactive_df <- reactive({
 })
 ```
 
-Column {.tabset}
------------------------------------------------------------------------
+## Column {.tabset}
 
 ### Level:
 
-####
+#### 
 
 ```{r}
 plotly::renderPlotly({
@@ -127,32 +216,32 @@ plotly::renderPlotly({
     input$theme,
     input$type,
     input$pal,
-    title=input$name,
+    title = input$name,
     spn = input$span,
     el = input$include_origin
   )
 }) %>%
   bindCache(
     "level",
-    input$name, 
-    input$theme, 
+    input$name,
+    input$theme,
     input$type,
     input$pal,
     input$span,
     input$include_origin
   )
 renderUI({
-  if(str_detect(reactive_df()$Source[1], "http")){
-     HTML(paste("Source: <a href='",reactive_df()$Source[1],"'>",reactive_df()$Source[1],"</a>"))
+  if (str_detect(reactive_df()$Source[1], "http")) {
+    HTML(paste("Source: <a href='", reactive_df()$Source[1], "'>", reactive_df()$Source[1], "</a>"))
   } else {
     paste("Source: ", reactive_df()$Source[1])
-  } 
+  }
 })
 ```
 
 ### Change from last observation:
 
-####
+#### 
 
 ```{r}
 plotly::renderPlotly({
@@ -164,30 +253,30 @@ plotly::renderPlotly({
     input$theme,
     input$type,
     input$pal,
-    title=input$name,
+    title = input$name,
     spn = input$span
   )
 }) %>%
   bindCache(
     "change",
-    input$name, 
-    input$theme, 
+    input$name,
+    input$theme,
     input$type,
     input$pal,
     input$span
   )
 renderUI({
-  if(str_detect(reactive_df()$Source[1], "http")){
-     HTML(paste("Source: <a href='",reactive_df()$Source[1],"'>",reactive_df()$Source[1],"</a>"))
+  if (str_detect(reactive_df()$Source[1], "http")) {
+    HTML(paste("Source: <a href='", reactive_df()$Source[1], "'>", reactive_df()$Source[1], "</a>"))
   } else {
     paste("Source: ", reactive_df()$Source[1])
-  } 
+  }
 })
 ```
 
 ### Annual Change:
 
-####
+#### 
 
 ```{r}
 plotly::renderPlotly({
@@ -199,31 +288,31 @@ plotly::renderPlotly({
     input$theme,
     input$type,
     input$pal,
-    title=input$name,
+    title = input$name,
     spn = input$span
   )
 }) %>%
   bindCache(
     "annual change",
-    input$name, 
-    input$theme, 
+    input$name,
+    input$theme,
     input$type,
     input$pal,
     input$span
   )
 renderUI({
-  if(str_detect(reactive_df()$Source[1], "http")){
-     HTML(paste("Source: <a href='",reactive_df()$Source[1],"'>",reactive_df()$Source[1],"</a>"))
+  if (str_detect(reactive_df()$Source[1], "http")) {
+    HTML(paste("Source: <a href='", reactive_df()$Source[1], "'>", reactive_df()$Source[1], "</a>"))
   } else {
     paste("Source: ", reactive_df()$Source[1])
-  } 
+  }
 })
 ```
 
 ### The Data:
 
-####
-  
+#### 
+
 ```{r}
 DT::renderDataTable(server = FALSE, {
   reactive_df() %>%
@@ -254,79 +343,76 @@ DT::renderDataTable(server = FALSE, {
 }) %>%
   bindCache(input$name)
 renderUI({
-  if(str_detect(reactive_df()$Source[1], "http")){
-     HTML(paste("Source: <a href='",reactive_df()$Source[1],"'>",reactive_df()$Source[1],"</a>"))
+  if (str_detect(reactive_df()$Source[1], "http")) {
+    HTML(paste("Source: <a href='", reactive_df()$Source[1], "'>", reactive_df()$Source[1], "</a>"))
   } else {
     paste("Source: ", reactive_df()$Source[1])
-  } 
+  }
 })
 ```
 
-All monthly series: 
-===================================== 
+# All monthly series:
 
-
- Inputs {.sidebar data-width=325}
--------------------------------------
+## Inputs {.sidebar data-width="325"}
 
 <br>
 
-*  The levels of the time series differ by several orders of magnitude. 
-*  Levels can also be close to zero implying that growth rates can also vary by several orders of magnitude.
-*  Two data normalizations are considered:
-    -  Binning: values $v$ are replaced by their (within series) percentile score.
-    -  Rescaling: values are replaced by $(v-\min(v))/(\max(v)-\min(v))$
-
+-   The levels of the time series differ by several orders of magnitude.
+-   Levels can also be close to zero implying that growth rates can also vary by several orders of magnitude.
+-   Two data normalizations are considered:
+    -   Binning: within-series percentile scores.
+    -   Re-scaling: via transformation $(x-\min(x))/(\max(x)-\min(x))$
+-   Note that re-scaling retains information regarding magnitude, which binning discards.
 
 ```{r}
 selectInput("norm",
-  label = "Choose a data normalization:",
-  choices = c("Binning","Rescaling"),
-  selected = "Rescaling"
+  label = "Choose a data visualization:",
+  choices = c(
+    "Binned Level",
+    "Rescaled Level",
+    "Binned Change",
+    "Rescaled Change",
+    "Binned Annual Change",
+    "Rescaled Annual Change"
+  ),
+  selected = "Rescaled Value"
 )
 
 wide <- reactive({
-  long %>%
-    select(longname, `Period Starting`, input$norm)%>%
-    pivot_wider(id_cols = longname, names_from = "Period Starting", values_from = input$norm)%>%
-    column_to_rownames(var="longname")
+  for_heatmap %>%
+    select(longname, `Period Starting`, input$norm) %>%
+    pivot_wider(id_cols = longname, names_from = "Period Starting", values_from = input$norm) %>%
+    column_to_rownames(var = "longname")
 })
 ```
 
-
-
-Column 
------------------------------------------------------------------------
+## Column
 
 ### 
 
 ```{r}
 renderPlot({
- pheatmap::pheatmap(wide(),
-         cluster_cols=FALSE,
-         angle_col=0,
-         main = str_to_title(paste("Monthly data, normalized by", input$norm)),
-         col=viridisLite::viridis(100),
-         labels_col=if_else(lubridate::month(lubridate::ymd(colnames(wide())))==1,
-                            as.character(lubridate::year(lubridate::ymd(colnames(wide())))),
-                                            "")) 
+  pheatmap::pheatmap(wide(),
+    cluster_cols = FALSE,
+    angle_col = 0,
+    main = str_to_title(paste("Monthly data, ", input$norm)),
+    col = viridisLite::viridis(100),
+    labels_col = if_else(lubridate::month(lubridate::ymd(colnames(wide()))) == 1,
+      as.character(lubridate::year(lubridate::ymd(colnames(wide())))),
+      ""
+    )
+  )
 })
 ```
 
-Major Project Inventory: 
-=====================================     
+# Major Project Inventory:
 
-Inputs {.sidebar}
--------------------------------------
+## Inputs {.sidebar}
 
 ```{r}
 char_cols <- colnames(mpi)[sapply(mpi, class) == "character"]
 possible_vars <- char_cols[char_cols != "source"]
 
-selectInput("filter_var",
-  label = "Choose a quarter:",
-  choices = unique(mpi$last_update), selected = tail(unique(mpi$last_update))
-)
 selectInput("x_var",
   label = "Choose a variable for x axis:",
   choices = possible_vars, selected = "region"
@@ -349,7 +435,6 @@ observe({
 
 mpi_group_summary <- reactive({
   mpi %>%
-    filter(as.character(last_update) == as.character(input$filter_var)) %>%
     group_by_(
       `X-axis variable` = input$x_var, # group_by_ DEPRECATED.
       `Y-axis variable` = input$y_var,
@@ -360,13 +445,12 @@ mpi_group_summary <- reactive({
 })
 ```
 
-Column {.tabset}
------------------------------------------------------------------------
+## Column {.tabset}
 
 ### Plot:
 
 ```{r}
-plotly::renderPlotly({
+renderPlot({
   plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`,
     `Y-axis variable`,
     fill = `Total Cost (M)`,
@@ -379,16 +463,16 @@ plotly::renderPlotly({
     theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1)) +
     labs(
       x = input$x_var,
-      y = input$y_var
+      y = input$y_var,
+      title = paste("Major Project Inventory:", tsibble::yearmonth(mpi$last_update[1]))
     )
-  plt <- aest::aest_fix_labs(plt)
-  plotly::ggplotly(plt, tooltip = "text")
+  aest::aest_fix_labs(plt)
 }) %>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
 
 ### Table:
-  
+
 ```{r}
 DT::renderDataTable(server = FALSE, {
   mpi_group_summary() %>%
@@ -414,6 +498,3 @@ DT::renderDataTable(server = FALSE, {
 }) %>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```
-
-
-
