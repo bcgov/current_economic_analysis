@@ -12,7 +12,6 @@ resource_files:
 - processed_data/mpi.rds
 - processed_data/nested_dataframe.rds
 - R/functions.R
-- commentary/commentary.md
 - processed_data/for_heatmap.rds
 - processed_data/for_up_down.rds
 - processed_data/commentary.rds
@@ -119,8 +118,14 @@ renderFormattable({
   formattable(for_up_down, 
               align=c("l","r","r","c","c"),
               list(
-    Value = formatter("span", x ~ comma(x, digits = 2)),
-    Change = formatter("span",
+    Value = formatter("span", x ~ case_when(str_detect(for_up_down$Name,"Merchandise Trade")~ scales::dollar(x, accuracy=1),
+                                            str_detect(for_up_down$Name,"dollars")~ scales::dollar(x, accuracy=1),
+                                            str_detect(for_up_down$Name,"yield")~ scales::percent(x, accuracy=.01),
+                                            str_detect(for_up_down$Name,"rate")~ scales::percent(x, accuracy=.01),
+                                            str_detect(for_up_down$Name,"Exchange Rate")~ scales::dollar(x, accuracy=.01),
+                                            TRUE ~ scales::comma(x, accuracy = 1))
+                      ),                  
+   Change = formatter("span",
       style = x ~ style(color = case_when(
         x + input$change_thres / 100 < 0 ~ "red",
         x - input$change_thres / 100 > 0 ~ "green",
@@ -211,7 +216,7 @@ plotly::renderPlotly({
   plotly_ts(
     reactive_df(),
     Value,
-    scales::comma,
+    "unknown",
     "the level of ",
     input$theme,
     input$type,
@@ -248,7 +253,7 @@ plotly::renderPlotly({
   plotly_ts(
     reactive_df(),
     `Change`,
-    scales::percent,
+    "percent",
     "the rate of change of ",
     input$theme,
     input$type,
@@ -283,7 +288,7 @@ plotly::renderPlotly({
   plotly_ts(
     reactive_df(),
     `Annual Change`,
-    scales::percent,
+    "percent",
     "the annual rate of change of ",
     input$theme,
     input$type,
@@ -380,6 +385,7 @@ selectInput("norm",
 
 wide <- reactive({
   for_heatmap %>%
+    filter(`Period Starting`> today() - years(10))%>%
     select(longname, `Period Starting`, input$norm) %>%
     pivot_wider(id_cols = longname, names_from = "Period Starting", values_from = input$norm) %>%
     column_to_rownames(var = "longname")
@@ -405,7 +411,7 @@ renderPlot({
 })
 ```
 
-# Major Project Inventory:
+# MPI:
 
 ## Inputs {.sidebar}
 
