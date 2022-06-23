@@ -103,7 +103,18 @@ extract_cell <- function(tbbl, nm) {
   return(tbbl)
 }
 # plotly time series plot------------
-plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, spn, el = FALSE) {
+plotly_ts <- function(tbbl, 
+                      thing, 
+                      format_as, 
+                      tt_text, 
+                      theme, 
+                      type, 
+                      pal, 
+                      title, 
+                      spn, 
+                      el = FALSE, 
+                      alf, 
+                      facet) {
   plt <- ggplot(tbbl, aes(`Period Starting`,
     {{ thing }},
     colour = Series,
@@ -146,7 +157,7 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, 
   } else {
     plt <- plt +
       geom_smooth(se = FALSE, span = spn, lwd = .5) +
-      geom_line(alpha = .2, lwd = .2)
+      geom_line(alpha = alf, lwd = .2)
   }
   if (pal == "Viridis") {
     plt <- plt +
@@ -184,6 +195,11 @@ plotly_ts <- function(tbbl, thing, format_as, tt_text, theme, type, pal, title, 
       plt <- plt + scale_y_continuous(labels = scales::comma)
     }
   }
+  if (facet == TRUE) {
+    plt <- plt +
+      facet_wrap(vars(Series), scales = "free")+
+      theme(legend.position='none')
+  }
   plotly::ggplotly(plt, tooltip = "text")
 }
 
@@ -201,3 +217,4 @@ my_formatter <- function(name, value) {
     TRUE ~ scales::comma(value, accuracy = 1)
   )
 }
+

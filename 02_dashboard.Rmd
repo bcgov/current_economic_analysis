@@ -57,7 +57,7 @@ source(here::here("R", "functions.R"))
 
 ```
 
-# Notable Series:
+# Commentary:
 
 ## Inputs {.sidebar}
 
@@ -71,6 +71,24 @@ source(here::here("R", "functions.R"))
 ## Column
 
 <br><br>
+
+**Fresh Data:**
+
+```{r, results='asis'}
+fresh <- commentary%>%
+            filter(relatively=="fresh")
+if(nrow(fresh)==0){
+  cat("* No fresh data to report.")
+}else{
+  cat(paste("*", 
+            fresh%>%
+              pull()),
+            sep = "\n")
+}  
+```
+
+
+
 
 **Notably High:**
 
@@ -182,6 +200,17 @@ conditionalPanel(
     .5
   )
 )
+conditionalPanel(
+  condition = "input.type == 'smooth'",
+  sliderInput(
+    "alpha",
+    "Alpha for raw data?",
+    .1,
+    .9,
+    .25
+  )
+)
+
 selectInput(
   "theme",
   "Choose a plot theme:",
@@ -199,7 +228,7 @@ selectInput(
 )
 
 checkboxInput("include_origin", "Should plot include origin?", FALSE)
-
+checkboxInput("facet", "Do you want to facet by Series?", FALSE)
 reactive_df <- reactive({
   extract_cell(nested_dataframe, input$name)
 })
@@ -223,7 +252,9 @@ plotly::renderPlotly({
     input$pal,
     title = input$name,
     spn = input$span,
-    el = input$include_origin
+    el = input$include_origin,
+    alf = input$alpha,
+    facet =input$facet
   )
 }) %>%
   bindCache(
@@ -233,7 +264,9 @@ plotly::renderPlotly({
     input$type,
     input$pal,
     input$span,
-    input$include_origin
+    input$include_origin,
+    input$alpha,
+    input$facet
   )
 renderUI({
   if (str_detect(reactive_df()$Source[1], "http")) {
@@ -259,7 +292,9 @@ plotly::renderPlotly({
     input$type,
     input$pal,
     title = input$name,
-    spn = input$span
+    spn = input$span,
+    alf =input$alpha,
+    facet = input$facet
   )
 }) %>%
   bindCache(
@@ -268,7 +303,9 @@ plotly::renderPlotly({
     input$theme,
     input$type,
     input$pal,
-    input$span
+    input$span,
+    input$alpha,
+    input$facet
   )
 renderUI({
   if (str_detect(reactive_df()$Source[1], "http")) {
@@ -294,7 +331,9 @@ plotly::renderPlotly({
     input$type,
     input$pal,
     title = input$name,
-    spn = input$span
+    spn = input$span,
+    alf =input$alpha,
+    facet =input$facet
   )
 }) %>%
   bindCache(
@@ -303,7 +342,9 @@ plotly::renderPlotly({
     input$theme,
     input$type,
     input$pal,
-    input$span
+    input$span,
+    input$alpha,
+    input$facet
   )
 renderUI({
   if (str_detect(reactive_df()$Source[1], "http")) {
@@ -382,14 +423,6 @@ selectInput("norm",
   ),
   selected = "Rescaled Value"
 )
-
-wide <- reactive({
-  for_heatmap %>%
-    filter(`Period Starting`> today() - years(10))%>%
-    select(longname, `Period Starting`, input$norm) %>%
-    pivot_wider(id_cols = longname, names_from = "Period Starting", values_from = input$norm) %>%
-    column_to_rownames(var = "longname")
-})
 ```
 
 ## Column
@@ -398,17 +431,24 @@ wide <- reactive({
 
 ```{r}
 renderPlot({
-  pheatmap::pheatmap(wide(),
+  wide <- for_heatmap %>%
+    filter(`Period Starting`> today() - years(10))%>%
+    select(longname, `Period Starting`, input$norm) %>%
+    pivot_wider(id_cols = longname, names_from = "Period Starting", values_from = input$norm) %>%
+    column_to_rownames(var = "longname")
+ 
+  pheatmap::pheatmap(wide,
     cluster_cols = FALSE,
     angle_col = 0,
     main = str_to_title(paste("Monthly data, ", input$norm)),
     col = viridisLite::viridis(100),
-    labels_col = if_else(lubridate::month(lubridate::ymd(colnames(wide()))) == 1,
-      as.character(lubridate::year(lubridate::ymd(colnames(wide())))),
-      ""
-    )
+    labels_col = if_else(lubridate::month(lubridate::ymd(colnames(wide))) == 1,
+      as.character(lubridate::year(lubridate::ymd(colnames(wide)))),
+      ""))
+})%>%
+  bindCache(
+    input$norm
   )
-})
 ```
 
 # MPI:

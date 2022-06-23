@@ -524,10 +524,12 @@ df_list$`B.C. Weekly Local Business Condition Index (Aug 2020=100)`<-get_cansim_
 #nest the data to calculate some statistics----------
 nested_dataframe <- enframe(df_list)%>%
   mutate(value=map(value, make_stats))
+
 #prepare data for heatmap----------
 for_heatmap <- nested_dataframe%>%
   filter(str_detect(name, "Monthly"))%>%
-  mutate(measure =map(value, function(x) x %>% select(`Period Starting`, 
+  mutate(measure =map(value, function(x) x %>% select(`Series`,
+                                                      `Period Starting`, 
                                                       `Binned Level`, 
                                                       `Rescaled Level`,
                                                       `Binned Change`,
@@ -539,7 +541,7 @@ for_heatmap <- nested_dataframe%>%
   unnest(measure)%>%
   unite(longname, name, Series, sep=": ")%>%
   arrange(`Period Starting`)%>%
-  filter(`Period Starting` > today()-years(11))
+  filter(`Period Starting` > today()-years(10))
 
 #notable recent MONTHLY levels-------------
 low <- for_heatmap%>%
@@ -557,6 +559,7 @@ high <- for_heatmap%>%
   ungroup()%>%
   slice_max(`Rescaled Level`, n = 5)%>%
   mutate(relatively="high")
+#look for fresh data-------------
 
 notables <- bind_rows(high, low)
 
@@ -587,9 +590,9 @@ commentary <- notables%>%
   ungroup()%>%
   select(relatively, commentary)
 
-
 #save the data-----------
 print(paste("using data from ", dim(nested_dataframe)[1], "sources"))
+write_rds(for_random_forest, here::here("processed_data", "for_random_forest.rds"))
 write_rds(commentary, here::here("processed_data", "commentary.rds"))
 write_rds(for_up_down, here::here("processed_data", "for_up_down.rds"))
 write_rds(nested_dataframe, here::here("processed_data", "nested_dataframe.rds"))
