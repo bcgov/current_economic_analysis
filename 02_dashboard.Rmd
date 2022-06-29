@@ -72,13 +72,13 @@ source(here::here("R", "functions.R"))
 
 <br><br>
 
-**Fresh Data:**
+**New Releases:**
 
 ```{r, results='asis'}
 fresh <- commentary%>%
             filter(relatively=="fresh")
 if(nrow(fresh)==0){
-  cat("* No fresh data to report.")
+  cat("* No new data over last 24 hours.")
 }else{
   cat(paste("*", 
             fresh%>%
@@ -86,9 +86,6 @@ if(nrow(fresh)==0){
             sep = "\n")
 }  
 ```
-
-
-
 
 **Notably High:**
 

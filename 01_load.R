@@ -61,7 +61,7 @@ if(permit_file_exists & permit_file_young){
   building_permits<- connection %>%
     filter(GEO=="British Columbia",
            Variables=="Value of permits",
-           `Seasonal adjustment`=="Seasonally adjusted, constant",
+           `Seasonal adjustment`=="Seasonally adjusted, current",
            `Type of work`=="Types of work, total",
            `Type of structure` %in% c("Total residential", "Total non-residential", "Total residential and non-residential")
     )%>%
@@ -71,7 +71,7 @@ if(permit_file_exists & permit_file_young){
       Series = paste(type_of_structure,"(dollars)"),
       `Period Starting` = lubridate::ym(ref_date),
       Value = value * 1000,
-      Source = paste("Statistics Canada. Table", cansim_id, "Building permits, by type of structure and type of work (x 1,000)")
+      Source = paste("Statistics Canada. Table", cansim_id, "Building permits, by type of structure and type of work (x 1,000), Seasonally adjusted, current dollars")
     ) %>%
     filter(`Period Starting` > lubridate::today() - lubridate::years(11))%>%
     select(`Period Starting`, Series, Value, Source)
@@ -524,7 +524,6 @@ df_list$`B.C. Weekly Local Business Condition Index (Aug 2020=100)`<-get_cansim_
 #nest the data to calculate some statistics----------
 nested_dataframe <- enframe(df_list)%>%
   mutate(value=map(value, make_stats))
-
 #prepare data for heatmap----------
 for_heatmap <- nested_dataframe%>%
   filter(str_detect(name, "Monthly"))%>%
@@ -542,7 +541,6 @@ for_heatmap <- nested_dataframe%>%
   unite(longname, name, Series, sep=": ")%>%
   arrange(`Period Starting`)%>%
   filter(`Period Starting` > today()-years(10))
-
 #notable recent MONTHLY levels-------------
 low <- for_heatmap%>%
   group_by(longname)%>%
@@ -561,7 +559,29 @@ high <- for_heatmap%>%
   mutate(relatively="high")
 #look for fresh data-------------
 
-notables <- bind_rows(high, low)
+old_data <- readRDS(here::here("processed_data", "nested_dataframe.rds"))%>%
+  unnest(value)%>%
+  unite(longname, name, Series, sep=": ")%>%
+  group_by(longname)%>%
+  filter(`Period Starting`==max(`Period Starting`))%>%
+  select(longname, old_last_obs=`Period Starting`)
+
+new_data <- nested_dataframe%>%
+  unnest(value)%>%
+  unite(longname, name, Series, sep=": ")%>%
+  group_by(longname)%>%
+  filter(`Period Starting`==max(`Period Starting`))%>%
+  select(longname, new_last_obs=`Period Starting`)
+
+fresh_series <- full_join(old_data, new_data)%>%
+  filter(old_last_obs!=new_last_obs)
+
+fresh <- inner_join(fresh_series, for_heatmap)%>%
+  select(`Period Starting`, `Rescaled Level`)%>%
+  mutate(relatively="fresh")%>%
+  filter(`Period Starting`==max(`Period Starting`))
+
+notables <- bind_rows(high, low, fresh)
 
 #prepare data for for up down page------------
 for_up_down <- nested_dataframe%>%
@@ -592,7 +612,6 @@ commentary <- notables%>%
 
 #save the data-----------
 print(paste("using data from ", dim(nested_dataframe)[1], "sources"))
-write_rds(for_random_forest, here::here("processed_data", "for_random_forest.rds"))
 write_rds(commentary, here::here("processed_data", "commentary.rds"))
 write_rds(for_up_down, here::here("processed_data", "for_up_down.rds"))
 write_rds(nested_dataframe, here::here("processed_data", "nested_dataframe.rds"))
