@@ -575,8 +575,9 @@ new_data <- nested_dataframe%>%
 
 fresh_series <- full_join(old_data, new_data)%>%
   filter(old_last_obs!=new_last_obs)
-
-fresh <- inner_join(fresh_series, for_heatmap)%>%
+#left join ensures that all fresh data is included, not just monthly. Only reason we join with
+#heatmap is to ensure fresh has same structure as dataframes high and low. 
+fresh <- left_join(fresh_series, for_heatmap)%>%
   select(`Period Starting`, `Rescaled Level`)%>%
   mutate(relatively="fresh")%>%
   filter(`Period Starting`==max(`Period Starting`))
