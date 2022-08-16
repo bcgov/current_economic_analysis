@@ -14,18 +14,18 @@ get_cansim_unfiltered <- function(cansim_id, add_label, multiply_value_by = 1, s
     filter(`Period Starting` > today() - years(11))
 }
 # convert JSON data to tibble------------
-df_from_JSON <- function(url, add_label, index_date) {
-  tbbl <- jsonlite::fromJSON(url)
-  tbbl <- as.data.frame(tbbl)
-  tbbl <- as.data.frame(tbbl$series.data)
-  colnames(tbbl) <- c("ref_date", "value")
-  #  browser()
-  tbbl <- tbbl %>%
+df_from_JSON <- function(url, series_name, index_date) {
+  temp <- jsonlite::fromJSON(url)
+  tbbl <- temp$response$data%>%
+    filter(series==series_name)%>%
+    as_tibble()
+#  browser()
+ tbbl <- tbbl %>%
     mutate(
-      `Period Starting` = lubridate::ym(paste0(substring(ref_date, 1, 4), "-", substring(ref_date, 5, 6))),
-      Series = add_label,
+      `Period Starting` = lubridate::ym(period),
+      Series = `series-description`,
       Value = as.numeric(value),
-      Source = url
+      Source = str_split(url, "api_key")[[1]][1]
     )
   df_index_value <- tbbl %>%
     filter(`Period Starting` == index_date) %>%

@@ -264,34 +264,21 @@ df_list$`B.C. Monthly visitors` <- get_cansim_unfiltered("24-10-0050-01",
          )%>%
   select(`Period Starting`, Series=country_of_residence, Value, Source)
 
-# Natural gas (US data)
-natural_gas <- df_from_JSON("https://api.eia.gov/series/?api_key=27362c25d353053742ba1bfe76c54bb8&series_id=NG.RNGWHHD.M",
-                            "Natural Gas Index",
+# Natural gas (US data)------------
+
+natural_gas <- df_from_JSON("https://api.eia.gov/v2/natural-gas/pri/fut/data/?api_key=27362c25d353053742ba1bfe76c54bb8&frequency=monthly&data[]=value",
+                            "RNGWHHD",
                             index_date)
-# Oil (US data)
-oil <- df_from_JSON("https://api.eia.gov/series/?api_key=27362c25d353053742ba1bfe76c54bb8&series_id=PET.RWTC.M",
-                    "Oil Index",
-                    index_date)
-#forestry (Canadian data) ...weird file structure... THIS COULD BREAK
-forestry_url <- "https://www.bankofcanada.ca/valet/observations/group/BCPI_MONTHLY/json?start_date=1972-01-01"
-forestry <- jsonlite::fromJSON(forestry_url)$observations
-forestry <- forestry%>%
-  as_tibble()%>%
-  janitor::clean_names()%>%
-  select(ref_date = d, value = m_fopr)%>%
-  mutate(`Period Starting` = ymd(ref_date),
-         Value = as.numeric(unlist(value)),
-         Series = "Forestry Index",
-         Source = forestry_url)
-forestry_index_value <- forestry%>%
-  filter(`Period Starting` == index_date)%>%
-  pull(Value)
-forestry <- forestry%>%
-mutate(Value = 100*Value/forestry_index_value)%>%
-  filter(`Period Starting` > today()-years(11))%>%
-  select(`Period Starting`, Series, Value, Source)
-df_list$`Canada Monthly Forestry and Energy Indicies (Jan 2014 = 100)` <- bind_rows(natural_gas, oil, forestry)%>%
-  arrange(`Period Starting`)
+
+# Oil (US data)------------
+oil <- df_from_JSON("https://api.eia.gov/v2/petroleum/pri/spt/data/?api_key=27362c25d353053742ba1bfe76c54bb8&frequency=monthly&data[]=value",
+                            "RWTC",
+                            index_date)
+
+
+df_list$`USA Monthly Energy Indicies (Jan 2014 = 100)` <- bind_rows(natural_gas, oil)%>%
+  arrange(`Period Starting`)%>%
+  mutate(Source = paste(natural_gas$Source[1], oil$Source[1], sep = " AND "))
 #manufacturing: sales ---------------
 df_list$`B.C. Monthly Manufacturing Sales` <- get_cansim_unfiltered("16-10-0048",
                                                             add_label = "Manufacturing Sales (dollars)",
@@ -360,14 +347,14 @@ df_list$`B.C. Monthly Food and Drink Employment`<- get_cansim_unfiltered("14-10-
          type_of_employee == "All employees")%>%
   select(`Period Starting`, Series, Value, Source)
 #business confidence------------
-guess_last_report_date <- format(today()-months(1), format="%Y-%m") #THIS COULD BREAK
-business_confidence_url <- paste0("https://content.cfib-fcei.ca/sites/default/files/",
-                                  guess_last_report_date,
-                                  "/business-barometer-data-donnes.xlsx")
-download.file(business_confidence_url, here::here("raw_data", "business_confidence.xlsx"))
-business_confidence <- readxl::read_excel(here::here("raw_data", "business_confidence.xlsx"),
-                                          skip = 2,
-                                          n_max = 31) #THIS COULD BREAK
+business_confidence_url <- "https://20336445.fs1.hubspotusercontent-na1.net/hubfs/20336445/research/business-barometer-data-donnes.xlsx"
+download.file(business_confidence_url, here::here("raw_data","business_confidence.xlsx"))
+business_confidence <- readxl::read_excel(here::here("raw_data","business_confidence.xlsx"),
+                           sheet="Datafile",
+                           skip=2, 
+                           n_max= 31
+                           )
+
 date_column_names <- colnames(business_confidence)[-c(1:3)]%>% #THIS COULD BREAK
   str_sub(end = 5)%>% #trims off some garbage
   as.numeric()%>%
