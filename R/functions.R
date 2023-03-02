@@ -147,7 +147,7 @@ plotly_ts <- function(tbbl,
     )
   )) +
     scale_x_date(limits = c(today() - years(10), today())) +
-    get(theme)()
+    get(theme)(base_size = 15)
   if (type == "column") {
     plt <- plt +
       geom_col(position = "dodge", size = 0)
@@ -200,7 +200,14 @@ plotly_ts <- function(tbbl,
       facet_wrap(vars(Series), scales = "free")+
       theme(legend.position='none')
   }
-  plotly::ggplotly(plt, tooltip = "text")
+  plotly::ggplotly(plt, tooltip = "text")%>%
+    plotly::config(
+      toImageButtonOptions = list(
+        format = "svg",
+        width = 960,
+        height = 720
+      )
+    )
 }
 
 range01 <- function(x, ...) {
@@ -217,4 +224,16 @@ my_formatter <- function(name, value) {
     TRUE ~ scales::comma(value, accuracy = 1)
   )
 }
+
+aest_fix_labs <- function(gg){
+  gg <- gg+
+    ggplot2::labs(title=stringr::str_to_title(stringr::str_replace_all(gg$labels$title, "_", " ")),
+                  x=stringr::str_to_title(stringr::str_replace_all(gg$labels$x, "_", " ")),
+                  y=stringr::str_to_title(stringr::str_replace_all(gg$labels$y, "_", " ")),
+                  colour=stringr::str_to_title(stringr::str_replace_all(gg$labels$colour, "_", " ")),
+                  fill=stringr::str_to_title(stringr::str_replace_all(gg$labels$fill, "_", " ")),
+                  edge_colour=stringr::str_to_title(stringr::str_replace_all(gg$labels$edge_colour, "_", " ")))
+  return(gg)
+}
+
 

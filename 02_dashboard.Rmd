@@ -37,6 +37,8 @@ library(lubridate) # years and months not exported by lubridate
 library(ggthemes)
 library(markdown)
 library(formattable)
+#knitr::opts_chunk$set(fig.retina = 2)
+theme_set(theme_minimal(base_size = 15))
 themes <- ls("package:ggplot2", pattern = "^theme_")
 themes <- themes[
   themes != "theme_get" &
@@ -238,7 +240,7 @@ reactive_df <- reactive({
 #### 
 
 ```{r}
-plotly::renderPlotly({
+plotly::renderPlotly({ 
   plotly_ts(
     reactive_df(),
     Value,
@@ -509,7 +511,7 @@ renderPlot({
       y = input$y_var,
       title = paste("Major Project Inventory:", tsibble::yearmonth(mpi$last_update[1]))
     )
-  aest::aest_fix_labs(plt)
+  aest_fix_labs(plt)
 }) %>%
   bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
 ```

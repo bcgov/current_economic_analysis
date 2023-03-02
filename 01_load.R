@@ -465,7 +465,8 @@ df_list$`B.C. Monthly Births and Deaths` <- bind_rows(births, deaths)%>%
               values_from = Value)%>%
   mutate(`net difference` = births - deaths)%>%
   pivot_longer(cols = -`Period Starting`, names_to = "Series", values_to = "Value")%>%
-  mutate(Source="https://www2.gov.bc.ca/gov/content/life-events/statistics-reports")
+  mutate(Source="https://www2.gov.bc.ca/gov/content/life-events/statistics-reports")%>%
+  filter(`Period Starting`<max(`Period Starting`)) #partial month at end...
 
 #interprovincial migration------------
 df_list$`B.C. Quarterly Interprovincial Migration`<- get_cansim_unfiltered("17-10-0020",
