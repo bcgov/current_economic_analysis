@@ -107,7 +107,6 @@ plotly_ts <- function(tbbl,
                       thing, 
                       format_as, 
                       tt_text, 
-                      theme, 
                       type, 
                       pal, 
                       title, 
@@ -146,8 +145,7 @@ plotly_ts <- function(tbbl,
       }
     )
   )) +
-    scale_x_date(limits = c(today() - years(10), today())) +
-    get(theme)(base_size = 15)
+    scale_x_date(limits = c(today() - years(10), today()))
   if (type == "column") {
     plt <- plt +
       geom_col(position = "dodge", size = 0)

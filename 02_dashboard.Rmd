@@ -37,17 +37,14 @@ library(lubridate) # years and months not exported by lubridate
 library(ggthemes)
 library(markdown)
 library(formattable)
-#knitr::opts_chunk$set(fig.retina = 2)
-theme_set(theme_minimal(base_size = 15))
-themes <- ls("package:ggplot2", pattern = "^theme_")
-themes <- themes[
-  themes != "theme_get" &
-    themes != "theme_set" &
-    themes != "theme_replace" &
-    themes != "theme_test" &
-    themes != "theme_update"
-]
-themes <- c(themes, ls("package:ggthemes", pattern = "^theme_"))
+library(ggplot2)
+library(Formula)
+library(inum)
+library(libcoin)
+library(partykit)
+
+theme_set(theme_minimal(base_size = 15, base_family = "Franklin Gothic Book"))
+
 # load objects----------
 commentary <- readRDS(here::here("processed_data", "commentary.rds"))
 nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds"))
@@ -56,7 +53,6 @@ for_up_down <- readRDS(here::here("processed_data", "for_up_down.rds"))
 mpi <- readRDS(here::here("processed_data", "mpi.rds")) %>%
   filter(last_update > today() - years(5)) # a single project had a last_update value of 2016?
 source(here::here("R", "functions.R"))
-
 ```
 
 # Commentary:
@@ -211,14 +207,6 @@ conditionalPanel(
 )
 
 selectInput(
-  "theme",
-  "Choose a plot theme:",
-  themes,
-  selected = "theme_minimal",
-  multiple = FALSE
-)
-
-selectInput(
   "pal",
   "Choose a colour palette:",
   c("Viridis", "Set2", "Paired", "Dark2"),
@@ -246,7 +234,6 @@ plotly::renderPlotly({
     Value,
     "unknown",
     "the level of ",
-    input$theme,
     input$type,
     input$pal,
     title = input$name,
@@ -259,7 +246,6 @@ plotly::renderPlotly({
   bindCache(
     "level",
     input$name,
-    input$theme,
     input$type,
     input$pal,
     input$span,
@@ -287,7 +273,6 @@ plotly::renderPlotly({
     `Change`,
     "percent",
     "the rate of change of ",
-    input$theme,
     input$type,
     input$pal,
     title = input$name,
@@ -299,7 +284,6 @@ plotly::renderPlotly({
   bindCache(
     "change",
     input$name,
-    input$theme,
     input$type,
     input$pal,
     input$span,
@@ -326,7 +310,6 @@ plotly::renderPlotly({
     `Annual Change`,
     "percent",
     "the annual rate of change of ",
-    input$theme,
     input$type,
     input$pal,
     title = input$name,
@@ -338,7 +321,6 @@ plotly::renderPlotly({
   bindCache(
     "annual change",
     input$name,
-    input$theme,
     input$type,
     input$pal,
     input$span,
