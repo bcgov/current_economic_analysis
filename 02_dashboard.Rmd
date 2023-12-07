@@ -33,15 +33,15 @@ resource_files:
 # library(DT)
 library(tidyverse)
 library(tsibble) # data includes a tsibble::yearquarter field
-library(lubridate) # years and months not exported by lubridate
+#library(lubridate) # years and months not exported by lubridate
 library(ggthemes)
 library(markdown)
 library(formattable)
 library(ggplot2)
-library(Formula)
-library(inum)
-library(libcoin)
-library(partykit)
+#library(Formula)
+#library(inum)
+#library(libcoin)
+#library(partykit)
 
 theme_set(theme_minimal(base_size = 15, base_family = "Franklin Gothic Book"))
 

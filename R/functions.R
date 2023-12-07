@@ -59,6 +59,7 @@ get_totals <- function(tbbl, year, label) {
 }
 # calculate some stats------------
 make_stats <- function(tbbl) {
+  #browser()
   frequency_all_series <- tbbl %>%
     group_by(Series) %>%
     summarize(frequency = case_when(
@@ -195,10 +196,11 @@ plotly_ts <- function(tbbl,
   }
   if (facet == TRUE) {
     plt <- plt +
-      facet_wrap(vars(Series), scales = "free")+
+      facet_wrap(vars(Series), scales = "free", ncol = 2)+
       theme(legend.position='none')
   }
   plotly::ggplotly(plt, tooltip = "text")%>%
+    plotly::layout(legend = list(title=list(text=""), orientation = "h", x = 0.4, y = -0.2))|>
     plotly::config(
       toImageButtonOptions = list(
         format = "svg",

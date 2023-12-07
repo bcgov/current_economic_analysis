@@ -14,7 +14,9 @@
 #Output is a nested dataframe saved as an RDS
 #libraries-----------
 library(tidyverse)
-library(lubridate)
+library(conflicted)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::lag)
 #functions----------
 source(here::here("R", "functions.R"))
 #create a directory for raw data if does not exist----------
@@ -187,7 +189,7 @@ df_list$`Canada Monthly GDP` <- get_cansim_unfiltered("36-10-0434",
                                                                       "Gross domestic product (GDP) at basic prices, by industry, monthly (x 1,000,000)"
                                                                       )%>%
   filter(seasonal_adjustment == "Seasonally adjusted at annual rates",
-        prices == "Chained (2012) dollars",
+        prices == "Chained (2017) dollars",
         north_american_industry_classification_system_naics == "All industries [T001]")%>%
   select(`Period Starting`, Series, Value, Source)
 #non farm payroll ----------------
@@ -486,7 +488,7 @@ df_list$`B.C. Quarterly International Migration` <- get_cansim_unfiltered("17-10
   filter(geo == "British Columbia")%>%
   select(`Period Starting`, Value, Series = components_of_population_growth, Source)%>%
   pivot_wider(id_cols = c(`Period Starting`,Source), names_from = Series, values_from = Value)%>%
-  mutate(`Net international in-migration`=Immigrants+`Net non-permanent residents`-Emigrants-`Net temporary emigrants`+`Returning emigrants`)%>%
+  mutate(`Net international in-migration`=Immigrants+`Net non-permanent residents`-Emigrants-`Net temporary emigration`+`Returning emigrants`)%>%
   pivot_longer(cols=-c(`Period Starting`,Source), names_to = "Series", values_to = "Value")
 # experimental economic activity index-----------
 df_list$`B.C. Monthly Economic Activity (Jan 2002=100)` <- get_cansim_unfiltered("36-10-0633-01",
@@ -511,7 +513,7 @@ df_list$`B.C. Weekly Local Business Condition Index (Aug 2020=100)`<-get_cansim_
 
 #nest the data to calculate some statistics----------
 nested_dataframe <- enframe(df_list)%>%
-  mutate(value=map(value, make_stats))
+  mutate(value=map(value, make_stats)) #ERROR?
 #prepare data for heatmap----------
 for_heatmap <- nested_dataframe%>%
   filter(str_detect(name, "Monthly"))%>%
