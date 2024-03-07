@@ -30,19 +30,14 @@ resource_files:
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 # libraries----------
-# library(DT)
 library(tidyverse)
 library(tsibble) # data includes a tsibble::yearquarter field
-#library(lubridate) # years and months not exported by lubridate
 library(ggthemes)
 library(markdown)
 library(formattable)
 library(ggplot2)
-#library(Formula)
-#library(inum)
-#library(libcoin)
-#library(partykit)
-
+library(conflicted)
+conflicts_prefer(dplyr::filter)
 theme_set(theme_minimal(base_size = 15, base_family = "Franklin Gothic Book"))
 
 # load objects----------
@@ -50,8 +45,6 @@ commentary <- readRDS(here::here("processed_data", "commentary.rds"))
 nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds"))
 for_heatmap <- readRDS(here::here("processed_data", "for_heatmap.rds"))
 for_up_down <- readRDS(here::here("processed_data", "for_up_down.rds"))
-mpi <- readRDS(here::here("processed_data", "mpi.rds")) %>%
-  filter(last_update > today() - years(5)) # a single project had a last_update value of 2016?
 source(here::here("R", "functions.R"))
 ```
 
@@ -432,96 +425,4 @@ renderPlot({
   )
 ```
 
-# MPI:
 
-## Inputs {.sidebar}
-
-```{r}
-char_cols <- colnames(mpi)[sapply(mpi, class) == "character"]
-possible_vars <- char_cols[char_cols != "source"]
-
-selectInput("x_var",
-  label = "Choose a variable for x axis:",
-  choices = possible_vars, selected = "region"
-)
-selectInput("y_var",
-  label = "Choose a variable for y axis:",
-  choices = possible_vars, selected = "project_stage"
-)
-selectInput("facet_var",
-  label = "Choose a variable to facet by:",
-  choices = possible_vars, selected = "project_status"
-)
-
-observe({
-  updateSelectInput(session, "y_var", choices = possible_vars[possible_vars != input$x_var])
-})
-observe({
-  updateSelectInput(session, "facet_var", choices = possible_vars[possible_vars != input$x_var & possible_vars != input$y_var])
-})
-
-mpi_group_summary <- reactive({
-  mpi %>%
-    group_by_(
-      `X-axis variable` = input$x_var, # group_by_ DEPRECATED.
-      `Y-axis variable` = input$y_var,
-      `Facet variable` = input$facet_var
-    ) %>%
-    summarize(`Total Cost (M)` = sum(estimated_cost, na.rm = TRUE)) %>%
-    filter(`Total Cost (M)` > 0)
-})
-```
-
-## Column {.tabset}
-
-### Plot:
-
-```{r}
-renderPlot({
-  plt <- ggplot(mpi_group_summary(), aes(`X-axis variable`,
-    `Y-axis variable`,
-    fill = `Total Cost (M)`,
-    text = paste("Total project cost is", scales::comma(`Total Cost (M)`), "Million.")
-  )) +
-    geom_tile() +
-    scale_fill_viridis_c(trans = "log10", labels = scales::comma) +
-    facet_wrap(~`Facet variable`) +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1)) +
-    labs(
-      x = input$x_var,
-      y = input$y_var,
-      title = paste("Major Project Inventory:", tsibble::yearmonth(mpi$last_update[1]))
-    )
-  aest_fix_labs(plt)
-}) %>%
-  bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
-```
-
-### Table:
-
-```{r}
-DT::renderDataTable(server = FALSE, {
-  mpi_group_summary() %>%
-    DT::datatable(
-      extensions = "Buttons",
-      options = list(
-        rownames = FALSE,
-        columnDefs = list(list(className = "dt-center", targets = "_all")),
-        paging = TRUE,
-        scrollX = TRUE,
-        scrollY = TRUE,
-        searching = TRUE,
-        ordering = TRUE,
-        dom = "Btip",
-        buttons = list(
-          list(extend = "csv", filename = "MPI"),
-          list(extend = "excel", filename = "MPI")
-        ),
-        pageLength = 10,
-        lengthMenu = c(3, 5)
-      )
-    )
-}) %>%
-  bindCache(input$filter_var, input$x_var, input$y_var, input$facet_var)
-```

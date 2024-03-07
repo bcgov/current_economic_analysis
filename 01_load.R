@@ -99,33 +99,7 @@ commodity <- read_csv(commodity_url,
   filter(`Period Starting` > today()-years(11))%>%
   select(`Period Starting`, Series, Value, Source)
 df_list$`Canada Monthly Commodity Price Indicies (Jan 1972 = 100)` <- commodity
-#Major Project Inventory---------
-mpi_url_to_scrape <- "https://www2.gov.bc.ca/gov/content/employment-business/economic-development/industry/bc-major-projects-inventory/recent-reports"
-mpi_scraped <- rvest::read_html(mpi_url_to_scrape)
-mpi_links <- rvest::html_attr(rvest::html_nodes(mpi_scraped, "a"), "href") #all the links
-mpi_links <- mpi_links[mpi_links%>%startsWith("/assets/") & mpi_links%>%endsWith(".xlsx")]%>% #stubs of the links we want.
-  na.omit()%>%
-  head(n = 1) #(just most recent quarter)
-mpi_links <- paste0("https://www2.gov.bc.ca", mpi_links) #paste the head onto the stubs
-mpi_files <- str_sub(mpi_links, start = -24) #names for the files
-mapply(download.file, mpi_links, here::here("raw_data", mpi_files)) #downloads all the mpi files into folder raw_data
-mpi_all_sheets <- sapply(here::here("raw_data", mpi_files), readxl::excel_sheets) #gets all the sheets
-mpi_keep_sheets <- lapply(mpi_all_sheets, function(x) x[startsWith(x, "mpi")])%>% #only the sheets we want
-  unlist(use.names = FALSE)
-mpi_nested <- tibble(file = here::here("raw_data", mpi_files), sheet = mpi_keep_sheets)%>%
-  mutate(data = map2(file, sheet, readxl::read_excel))
-mpi <- data.table::rbindlist(mpi_nested$data, use.names=FALSE)%>%
-  as_tibble()%>%
-  janitor::clean_names()%>%
-  select(estimated_cost,
-         construction_type,
-         region,
-         project_status,
-         project_category_name,
-         first_entry_date,
-         last_update)%>%
-  mutate(source=mpi_url_to_scrape)%>%
-  filter(last_update==max(last_update)) #file has 3 records where last update non consistent..
+#Major Project Inventory (axed, can no longer be auto scraped)
 
 #insolvencies---------
 #THIS COULD EASILY BREAK... terrible file structure
@@ -268,12 +242,12 @@ df_list$`B.C. Monthly visitors` <- get_cansim_unfiltered("24-10-0050-01",
 
 # Natural gas (US data)------------
 
-natural_gas <- df_from_JSON("https://api.eia.gov/v2/natural-gas/pri/fut/data/?api_key=27362c25d353053742ba1bfe76c54bb8&frequency=monthly&data[]=value",
+natural_gas <- df_from_JSON("https://api.eia.gov/v2/natural-gas/pri/fut/data/?api_key=mxiuUgM8bxttZDmMYokqcXFlY3vpcDe12DTuCrgF&frequency=monthly&data[]=value",
                             "RNGWHHD",
                             index_date)
 
 # Oil (US data)------------
-oil <- df_from_JSON("https://api.eia.gov/v2/petroleum/pri/spt/data/?api_key=27362c25d353053742ba1bfe76c54bb8&frequency=monthly&data[]=value",
+oil <- df_from_JSON("https://api.eia.gov/v2/petroleum/pri/spt/data/?api_key=mxiuUgM8bxttZDmMYokqcXFlY3vpcDe12DTuCrgF&frequency=monthly&data[]=value",
                             "RWTC",
                             index_date)
 
@@ -349,13 +323,14 @@ df_list$`B.C. Monthly Food and Drink Employment`<- get_cansim_unfiltered("14-10-
          type_of_employee == "All employees")%>%
   select(`Period Starting`, Series, Value, Source)
 #business confidence------------
-business_confidence_url <- "https://20336445.fs1.hubspotusercontent-na1.net/hubfs/20336445/research/business-barometer-data-donnes.xlsx"
+business_confidence_url <- "https://www.cfib-fcei.ca/hubfs/research/mbb/Business-barometer-data-donnes-2024-01-v2.xlsx"
 download.file(business_confidence_url, here::here("raw_data","business_confidence.xlsx"))
 business_confidence <- readxl::read_excel(here::here("raw_data","business_confidence.xlsx"),
                            sheet="Datafile",
                            skip=2, 
-                           n_max= 31
-                           )
+                           n_max= 39
+                           )|>
+  janitor::remove_empty()
 
 date_column_names <- colnames(business_confidence)[-c(1:3)]%>% #THIS COULD BREAK
   str_sub(end = 5)%>% #trims off some garbage
@@ -369,9 +344,10 @@ colnames(business_confidence) <- c("english",
 
 value <- business_confidence[business_confidence$english == "British Columbia", -c(1:3)]%>%
   na.omit()%>%
-  unlist()
+  unlist()|>
+  as.numeric()
 
-df_list$`B.C. Monthly CFIB Business Barometer`<- tibble(`Period Starting` = date_column_names,
+df_list$`B.C. Monthly CFIB Business Barometer`<- tibble(`Period Starting` = ymd(date_column_names),
                                 Series = "CFIB Index",
                                 value = value,
                                 Source = business_confidence_url)%>%
@@ -417,58 +393,8 @@ df_list$`B.C. Monthly Total Softwood`<- get_cansim_unfiltered("16-10-0017-05",
 #          value=as.numeric(value))%>%
 #   unite("ref_date",year,month,sep="-")%>%
 #   mutate(ref_date=yearmonth(ref_date))
-#births-----------
-#function tabulizer::extract_tables complains about an illegal operation (might fail in future.)
-births <- "https://www2.gov.bc.ca/gov/content/life-events/statistics-reports/births"
-births_html <- rvest::read_html(births)
-births_links <- rvest::html_nodes(births_html, "a") %>%
-  rvest::html_attr("href")
+#births and deaths (removed due to scraping changes)-----------
 
-births <- tibble(url = paste0("https://www2.gov.bc.ca",
-                              births_links[grep("birth-reports",
-                              births_links)]))%>% #COULD BREAK
-  mutate(year = str_sub(url,start = -8, end = -5), #COULD BREAK
-        data = map(url, tabulizer::extract_tables, pages = 4, output = "data.frame"), #COULD BREAK
-        data = map(data, unlist, recursive = FALSE),
-        data = map(data, as_tibble),
-        just_the_totals = map2(data, year, get_totals, "births")
-        )%>%
-  select(-data)%>%
-  unnest(just_the_totals)%>%
-  select(-url, -year)%>%
-  arrange(`Period Starting`)%>%
-  filter(`Period Starting` < today()-months(1),
-        `Period Starting` > today()-years(11))
-#deaths--------------
-deaths <- "https://www2.gov.bc.ca/gov/content/life-events/statistics-reports/deaths"
-deaths_html <- rvest::read_html(deaths)
-deaths_links <- rvest::html_nodes(deaths_html, "a") %>%
-  rvest::html_attr("href")
-
-deaths <- tibble(url = paste0("https://www2.gov.bc.ca",
-                              deaths_links[grep("death-reports",
-                              deaths_links)]))%>%
-  mutate(year = str_sub(url, start = -8, end = -5), #COULD BREAK
-         data=map(url, tabulizer::extract_tables, pages = 4, output = "data.frame"),#COULD BREAK
-         data=map(data, unlist, recursive=FALSE),
-         data=map(data, as_tibble),
-         just_the_totals=map2(data, year, get_totals, "deaths")
-         )%>%
-  select(-data)%>%
-  unnest(just_the_totals)%>%
-  select(-url, -year)%>%
-  arrange(`Period Starting`)%>%
-  filter(`Period Starting` < today()-months(1),
-        `Period Starting` > today()-years(11))
-
-df_list$`B.C. Monthly Births and Deaths` <- bind_rows(births, deaths)%>%
-  pivot_wider(id_cols = c(`Period Starting`),
-              names_from = Series, 
-              values_from = Value)%>%
-  mutate(`net difference` = births - deaths)%>%
-  pivot_longer(cols = -`Period Starting`, names_to = "Series", values_to = "Value")%>%
-  mutate(Source="https://www2.gov.bc.ca/gov/content/life-events/statistics-reports")%>%
-  filter(`Period Starting`<max(`Period Starting`)) #partial month at end...
 
 #interprovincial migration------------
 df_list$`B.C. Quarterly Interprovincial Migration`<- get_cansim_unfiltered("17-10-0020",
@@ -606,7 +532,6 @@ print(paste("using data from ", dim(nested_dataframe)[1], "sources"))
 write_rds(commentary, here::here("processed_data", "commentary.rds"))
 write_rds(for_up_down, here::here("processed_data", "for_up_down.rds"))
 write_rds(nested_dataframe, here::here("processed_data", "nested_dataframe.rds"))
-write_rds(mpi, here::here("processed_data", "mpi.rds"))
 write_rds(for_heatmap, here::here("processed_data", "for_heatmap.rds"))
 
 
