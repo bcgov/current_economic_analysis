@@ -135,9 +135,9 @@ insol_url_to_scrape <- "https://open.canada.ca/data/en/dataset/4444b25a-cd38-46b
 insol_scraped <- rvest::read_html(insol_url_to_scrape)
 insol_links <- rvest::html_attr(rvest::html_nodes(insol_scraped, "a"), "href") #all of the links
 insol_links <- insol_links[insol_links%>%endsWith(".xlsx") & !is.na(insol_links)] #the links we want.
-insol_files <- str_sub(insol_links, start = -23) #the destination file names
-mapply(download.file, insol_links, here::here("raw_data", insol_files)) #download the excel files
-insol <- tibble(file = here::here("raw_data", insol_files))%>% #create a dataframe with path to files
+insol_files <- paste0(parse_number(str_sub(insol_links, start = -14)),".xlsx") #creates file names in format year.xlsx
+mapply(download.file, insol_links, here::here("raw_data", "insolvencies", insol_files)) #download the excel files
+insol <- tibble(file = here::here("raw_data", "insolvencies", insol_files))%>% #create a dataframe with path to files
   mutate(data = map(file,
                     readxl::read_excel,
                     sheet = 1,
@@ -154,7 +154,7 @@ mutate(type = rep(c(rep("total", 46),#THIS COULD BREAK
 colnames(insol) <- c("Series", "file", "thing", month.abb)
 
 df_list$`B.C. Monthly Insolvencies` <- insol%>%
-  mutate(year = strex::str_extract_numbers(file))%>% #THIS COULD BREAK (it assumes year is in file name, but no other numbers)
+  mutate(year = parse_number(str_sub(file, start=-9)))%>% 
   filter(thing == "British Columbia/Colombie-Britannique")%>%
   select(-file, -thing)%>%
   pivot_longer(cols = all_of(month.abb), names_to = "name", values_to = "Value")%>%
