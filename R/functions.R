@@ -207,7 +207,7 @@ plotly_ts <- function(tbbl,
         width = 960,
         height = 720
       )
-    )
+    ) 
 }
 
 range01 <- function(x, ...) {

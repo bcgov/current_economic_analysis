@@ -37,7 +37,10 @@ library(markdown)
 library(formattable)
 library(ggplot2)
 library(conflicted)
+library(plotly)
+library(heatmaply)
 conflicts_prefer(dplyr::filter)
+conflicts_prefer(formattable::style)
 theme_set(theme_minimal(base_size = 15, base_family = "Franklin Gothic Book"))
 
 # load objects----------
@@ -46,6 +49,7 @@ nested_dataframe <- readRDS(here::here("processed_data", "nested_dataframe.rds")
 for_heatmap <- readRDS(here::here("processed_data", "for_heatmap.rds"))
 for_up_down <- readRDS(here::here("processed_data", "for_up_down.rds"))
 source(here::here("R", "functions.R"))
+
 ```
 
 # Commentary:
@@ -331,7 +335,7 @@ renderUI({
 
 ### The Data:
 
-#### 
+
 
 ```{r}
 DT::renderDataTable(server = FALSE, {
@@ -404,21 +408,15 @@ selectInput("norm",
 ### 
 
 ```{r}
-renderPlot({
+renderPlotly({
   wide <- for_heatmap %>%
     filter(`Period Starting`> today() - years(10))%>%
     select(longname, `Period Starting`, input$norm) %>%
     pivot_wider(id_cols = longname, names_from = "Period Starting", values_from = input$norm) %>%
     column_to_rownames(var = "longname")
  
-  pheatmap::pheatmap(wide,
-    cluster_cols = FALSE,
-    angle_col = 0,
-    main = str_to_title(paste("Monthly data, ", input$norm)),
-    col = viridisLite::viridis(100),
-    labels_col = if_else(lubridate::month(lubridate::ymd(colnames(wide))) == 1,
-      as.character(lubridate::year(lubridate::ymd(colnames(wide)))),
-      ""))
+  heatmaply::heatmaply(wide, fontsize_row = 6, fontsize_col = 4, dendrogram="row")
+
 })%>%
   bindCache(
     input$norm
