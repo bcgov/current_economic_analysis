@@ -3,7 +3,7 @@ title: "Current Economic Outlook"
 date: "`r paste0('updated: ',as.Date(file.info(here::here('processed_data','nested_dataframe.rds'))$mtime-lubridate::hours(7)))`"
 output:
   flexdashboard::flex_dashboard:
-    orientation: columns
+    orientation: rows
     social: menu
     source_code: https://github.com/bcgov/current_economic_analysis
     css: style.css
@@ -63,7 +63,9 @@ source(here::here("R", "functions.R"))
 
 <br>
 
-## Column
+##
+
+###
 
 <br><br>
 
@@ -119,7 +121,7 @@ sliderInput("annual_change_thres", "Annual changes smaller than this in grey.",
 
 ```
 
-## Column
+## Row
 
 ```{r}
 change_thres <- .1
@@ -218,11 +220,10 @@ reactive_df <- reactive({
 })
 ```
 
-## Column {.tabset}
+## Row {data-height=925 .tabset}
+-------------------------------------
 
 ### Level:
-
-#### 
 
 ```{r}
 plotly::renderPlotly({ 
@@ -250,18 +251,9 @@ plotly::renderPlotly({
     input$alpha,
     input$facet
   )
-renderUI({
-  if (str_detect(reactive_df()$Source[1], "http")) {
-    HTML(paste("Source: <a href='", reactive_df()$Source[1], "'>", reactive_df()$Source[1], "</a>"))
-  } else {
-    paste("Source: ", reactive_df()$Source[1])
-  }
-})
 ```
 
 ### Change from last observation:
-
-#### 
 
 ```{r}
 plotly::renderPlotly({
@@ -287,18 +279,9 @@ plotly::renderPlotly({
     input$alpha,
     input$facet
   )
-renderUI({
-  if (str_detect(reactive_df()$Source[1], "http")) {
-    HTML(paste("Source: <a href='", reactive_df()$Source[1], "'>", reactive_df()$Source[1], "</a>"))
-  } else {
-    paste("Source: ", reactive_df()$Source[1])
-  }
-})
 ```
 
 ### Annual Change:
-
-#### 
 
 ```{r}
 plotly::renderPlotly({
@@ -324,18 +307,9 @@ plotly::renderPlotly({
     input$alpha,
     input$facet
   )
-renderUI({
-  if (str_detect(reactive_df()$Source[1], "http")) {
-    HTML(paste("Source: <a href='", reactive_df()$Source[1], "'>", reactive_df()$Source[1], "</a>"))
-  } else {
-    paste("Source: ", reactive_df()$Source[1])
-  }
-})
 ```
 
 ### The Data:
-
-
 
 ```{r}
 DT::renderDataTable(server = FALSE, {
@@ -366,6 +340,14 @@ DT::renderDataTable(server = FALSE, {
     )
 }) %>%
   bindCache(input$name)
+```
+
+Row {data-height=75}
+-------------------------------------
+
+###
+
+```{r}
 renderUI({
   if (str_detect(reactive_df()$Source[1], "http")) {
     HTML(paste("Source: <a href='", reactive_df()$Source[1], "'>", reactive_df()$Source[1], "</a>"))
