@@ -9,7 +9,6 @@ output:
     css: style.css
 runtime: shiny
 resource_files:
-- processed_data/mpi.rds
 - processed_data/nested_dataframe.rds
 - R/functions.R
 - processed_data/for_heatmap.rds

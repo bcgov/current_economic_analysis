@@ -20,6 +20,5 @@ for (i in seq_along(load_data)){
            error = function(e) message("Oops!  ", as.character(e)))
 }
 #deploys the shiny app to shinyapps.io-----------
-rsconnect::deployApp("02_dashboard.Rmd", forceUpdate =TRUE)
-#knit the dull dashboard------------
-#rmarkdown::render("02_dull_dashboard.Rmd")
+rsconnect::deployDoc("02_dashboard.Rmd", forceUpdate =TRUE)
+

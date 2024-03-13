@@ -236,4 +236,24 @@ aest_fix_labs <- function(gg){
   return(gg)
 }
 
+get_prov_total <- function(file_name){
+  Series <- word(file_name, 1, sep="-")
+  Year <- sub(".*(\\d{4}).*", "\\1", file_name)
+  extract_tables(here("raw_data", "births_and_deaths", file_name), pages = 4, output = "data.frame")[[1]]|>
+    filter(Community.Health.Service.Area=="Provincial Total")|>
+    select(-Total)|>
+    column_to_rownames("Community.Health.Service.Area")|>
+    t()|>
+    as.data.frame()|>
+    rename(Value="Provincial Total")|>
+    rownames_to_column("Period Starting")|>
+    mutate(Value=as.numeric(str_remove_all(Value, ",")),
+          `Period Starting`=ym(paste(Year, `Period Starting`)),
+           Series=Series,
+           Source=paste0("https://www2.gov.bc.ca/gov/content/life-events/statistics-reports/", Series)
+    )
+}
+
+
+
 

@@ -15,6 +15,8 @@
 #libraries-----------
 library(tidyverse)
 library(conflicted)
+library(tabulizer)
+library(here)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
 #functions----------
@@ -58,25 +60,26 @@ if(permit_file_exists & permit_file_young){
   df_list$`B.C. Monthly Building Permits`<-readRDS(permit_file)
 }else{
   print("permit file out of date: this could take a while")
-  cansim_id <- "34-10-0066-01"
+  cansim_id <- "34-10-0285-01"
   connection <- cansim::get_cansim_sqlite(cansim_id)
   building_permits<- connection %>%
     filter(GEO=="British Columbia",
            Variables=="Value of permits",
-           `Seasonal adjustment`=="Seasonally adjusted, current",
+           `Seasonal adjustment, value type`=="Seasonally adjusted, current",
            `Type of work`=="Types of work, total",
-           `Type of structure` %in% c("Total residential", "Total non-residential", "Total residential and non-residential")
+           `Type of building` %in% c("Total residential", "Total non-residential", "Total residential and non-residential")
     )%>%
     cansim::collect_and_normalize()%>%
     janitor::clean_names()%>%
     mutate(
-      Series = paste(type_of_structure,"(dollars)"),
+      Series = paste(type_of_building,"(dollars)"),
       `Period Starting` = lubridate::ym(ref_date),
       Value = value * 1000,
       Source = paste("Statistics Canada. Table", cansim_id, "Building permits, by type of structure and type of work (x 1,000), Seasonally adjusted, current dollars")
     ) %>%
     filter(`Period Starting` > lubridate::today() - lubridate::years(11))%>%
     select(`Period Starting`, Series, Value, Source)
+
   saveRDS(building_permits, permit_file)
   df_list$`B.C. Monthly Building Permits` <- building_permits
   cansim::disconnect_cansim_sqlite(connection)
@@ -393,8 +396,6 @@ df_list$`B.C. Monthly Total Softwood`<- get_cansim_unfiltered("16-10-0017-05",
 #          value=as.numeric(value))%>%
 #   unite("ref_date",year,month,sep="-")%>%
 #   mutate(ref_date=yearmonth(ref_date))
-#births and deaths (removed due to scraping changes)-----------
-
 
 #interprovincial migration------------
 df_list$`B.C. Quarterly Interprovincial Migration`<- get_cansim_unfiltered("17-10-0020",
@@ -436,6 +437,18 @@ df_list$`B.C. Weekly Local Business Condition Index (Aug 2020=100)`<-get_cansim_
   mutate(ref_date=lubridate::ymd(ref_date))%>%
   select(`Period Starting` = ref_date, Series = geo, Value=value, Source=source)
 
+# Births and Deaths---------------------------------
+
+temp <-  tibble(file_name=list.files(here("raw_data","births_and_deaths")))|>
+  mutate(data=map(file_name, get_prov_total))|>
+  unnest(data)|>
+  select(-file_name)|>
+  filter(Value>0) #they report future months as 0's
+  
+df_list$`B.C. Monthly Births and Deaths`<- temp|>
+  ungroup()|>
+  dplyr::arrange(`Period Starting`)|>
+  head(n=nrow(temp)-4) # they report partial data over recent 2 months (2 series)
 
 #nest the data to calculate some statistics----------
 nested_dataframe <- enframe(df_list)%>%
