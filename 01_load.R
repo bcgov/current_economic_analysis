@@ -195,13 +195,15 @@ interest_rates<-get_cansim_unfiltered("10-10-0122",
                       'Bank rate',
                       'Selected Government of Canada benchmark bond yields: 10 years'))%>%
   select(`Period Starting`, Series = rates, Value, Source)
-mortgage_rates <- get_cansim_unfiltered("34-10-0145",
-                                        add_label = "5 year mortgage rate",
-                                        multiply_value_by = .01,
-                                        source_text = "Canada Mortgage and Housing Corporation, conventional mortgage lending rate, 5-year term"
-                                        )%>%
-  select(`Period Starting`, Series, Value, Source)
-df_list$`Canada Monthly Rates/Yields` <- bind_rows(interest_rates, mortgage_rates)%>%
+#dates f'd up on 5 year mortgages (ignore till fixed)
+# mortgage_rates <- get_cansim_unfiltered("34-10-0145",
+#                                         add_label = "5 year mortgage rate",
+#                                         multiply_value_by = .01,
+#                                         source_text = "Canada Mortgage and Housing Corporation, conventional mortgage lending rate, 5-year term"
+#                                         )%>%
+#   select(`Period Starting`, Series, Value, Source)
+df_list$`Canada Monthly Rates/Yields` <- interest_rates%>%
+#df_list$`Canada Monthly Rates/Yields` <- bind_rows(interest_rates, mortgage_rates)%>%
   mutate(Source = paste(interest_rates$Source[1],mortgage_rates$Source[1], sep = " AND "))
 #CADUSD exchange_rate---------
 #(series broken into 2 files that overlap)

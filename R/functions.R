@@ -59,7 +59,6 @@ get_totals <- function(tbbl, year, label) {
 }
 # calculate some stats------------
 make_stats <- function(tbbl) {
-  #browser()
   frequency_all_series <- tbbl %>%
     group_by(Series) %>%
     summarize(frequency = case_when(
