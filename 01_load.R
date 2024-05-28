@@ -111,7 +111,7 @@ df_list$`Canada Monthly Commodity Price Indicies (Jan 1972 = 100)` <- commodity
 insol_url_to_scrape <- "https://open.canada.ca/data/en/dataset/4444b25a-cd38-46b8-bfb8-15e5d28ba4e7"
 insol_scraped <- rvest::read_html(insol_url_to_scrape)
 insol_links <- rvest::html_attr(rvest::html_nodes(insol_scraped, "a"), "href") #all of the links
-insol_links <- insol_links[insol_links%>%endsWith(".xlsx") & !is.na(insol_links)] #the links we want.
+insol_links <- insol_links[insol_links|>endsWith(".xlsx") & !is.na(insol_links)] #the links we want.
 insol_files <- paste0(parse_number(str_sub(insol_links, start = -14)),".xlsx") #creates file names in format year.xlsx
 mapply(download.file, insol_links, here::here("raw_data", "insolvencies", insol_files)) #download the excel files
 insol <- tibble(file = here::here("raw_data", "insolvencies", insol_files))%>% #create a dataframe with path to files
@@ -196,14 +196,14 @@ interest_rates<-get_cansim_unfiltered("10-10-0122",
                       'Selected Government of Canada benchmark bond yields: 10 years'))%>%
   select(`Period Starting`, Series = rates, Value, Source)
 #dates f'd up on 5 year mortgages (ignore till fixed)
-# mortgage_rates <- get_cansim_unfiltered("34-10-0145",
-#                                         add_label = "5 year mortgage rate",
-#                                         multiply_value_by = .01,
-#                                         source_text = "Canada Mortgage and Housing Corporation, conventional mortgage lending rate, 5-year term"
-#                                         )%>%
-#   select(`Period Starting`, Series, Value, Source)
-df_list$`Canada Monthly Rates/Yields` <- interest_rates%>%
-#df_list$`Canada Monthly Rates/Yields` <- bind_rows(interest_rates, mortgage_rates)%>%
+mortgage_rates <- get_cansim_unfiltered("34-10-0145",
+                                        add_label = "5 year mortgage rate",
+                                        multiply_value_by = .01,
+                                        source_text = "Canada Mortgage and Housing Corporation, conventional mortgage lending rate, 5-year term"
+                                        )%>%
+  select(`Period Starting`, Series, Value, Source)
+#df_list$`Canada Monthly Rates/Yields` <- interest_rates%>%
+df_list$`Canada Monthly Rates/Yields` <- bind_rows(interest_rates, mortgage_rates)%>%
   mutate(Source = paste(interest_rates$Source[1],mortgage_rates$Source[1], sep = " AND "))
 #CADUSD exchange_rate---------
 #(series broken into 2 files that overlap)
@@ -299,7 +299,7 @@ df_list$`B.C. Monthly CPI (April 2002 = 100)`<- get_cansim_unfiltered("18-10-000
          products_and_product_groups == "All-items")%>%
   select(`Period Starting`, Series, Value, Source)
 #retail trade-------------
-df_list$`B.C. Monthly Retail Trade`<- get_cansim_unfiltered("20-10-0008",
+df_list$`B.C. Monthly Retail Trade`<- get_cansim_unfiltered("20-10-0056-01",
                                                     add_label = "Sales (dollars)",
                                                     multiply_value_by = 1000,
                                                     source_text = "Retail trade sales by province and territory (x 1,000)"
@@ -420,14 +420,14 @@ df_list$`B.C. Quarterly International Migration` <- get_cansim_unfiltered("17-10
   mutate(`Net international in-migration`=Immigrants+`Net non-permanent residents`-Emigrants-`Net temporary emigration`+`Returning emigrants`)%>%
   pivot_longer(cols=-c(`Period Starting`,Source), names_to = "Series", values_to = "Value")
 # experimental economic activity index-----------
-df_list$`B.C. Monthly Economic Activity (Jan 2002=100)` <- get_cansim_unfiltered("36-10-0633-01",
-                      add_label = "Simple index",
-                      source_text = "Experimental indexes of economic activity in the provinces and territories"
-)%>%
-  filter(geo=="British Columbia",
-         activity_index=="Simple economic activity index"
-  )%>%
-  select(`Period Starting`, Series, Value, Source)
+# df_list$`B.C. Monthly Economic Activity (Jan 2002=100)` <- get_cansim_unfiltered("36-10-0633-01",
+#                       add_label = "Simple index",
+#                       source_text = "Experimental indexes of economic activity in the provinces and territories"
+# )%>%
+#   filter(geo=="British Columbia",
+#          activity_index=="Simple economic activity index"
+#   )%>%
+#   select(`Period Starting`, Series, Value, Source)
 #Real-time Local Business Condition Index (RTLBCI)-----------
 df_list$`B.C. Weekly Local Business Condition Index (Aug 2020=100)`<-get_cansim_unfiltered("33-10-0398-01",
                             add_label = "",
