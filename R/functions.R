@@ -60,7 +60,9 @@ get_totals <- function(tbbl, year, label) {
 # calculate some stats------------
 make_stats <- function(tbbl) {
   frequency_all_series <- tbbl %>%
-    group_by(Series) %>%
+    group_by(Series)|>
+    distinct()|>
+    arrange(Series, `Period Starting`)|>
     summarize(frequency = case_when(
       all(near(1, diff(`Period Starting`), tol = 1)) ~ "daily",
       all(near(7, diff(`Period Starting`), tol = 2)) ~ "weekly",
@@ -79,7 +81,7 @@ make_stats <- function(tbbl) {
     frequency == "semi" ~ 2,
     frequency == "annual" ~ 1,
   )
-  tbbl <- tbbl %>%
+  tbbl %>%
     group_by(Series) %>%
     arrange(`Period Starting`) %>%
     mutate(

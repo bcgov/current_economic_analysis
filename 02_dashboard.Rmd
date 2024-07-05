@@ -373,14 +373,14 @@ renderUI({
 selectInput("norm",
   label = "Choose a data visualization:",
   choices = c(
-    "Binned Level",
-    "Rescaled Level",
-    "Binned Change",
-    "Rescaled Change",
-    "Binned Annual Change",
-    "Rescaled Annual Change"
+  #  "Binned Level",
+    "Rescaled Level"
+  #  "Binned Change",
+   # "Rescaled Change",
+  #  "Binned Annual Change",
+  #  "Rescaled Annual Change"
   ),
-  selected = "Rescaled Value"
+  selected = "Rescaled Level"
 )
 ```
 
@@ -393,6 +393,7 @@ renderPlotly({
   wide <- for_heatmap %>%
     filter(`Period Starting`> today() - years(10))%>%
     select(longname, `Period Starting`, input$norm) %>%
+    distinct()|>
     pivot_wider(id_cols = longname, names_from = "Period Starting", values_from = input$norm) %>%
     column_to_rownames(var = "longname")
  
