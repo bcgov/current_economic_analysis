@@ -15,7 +15,7 @@
 #libraries-----------
 library(tidyverse)
 library(conflicted)
-library(tabulizer)
+library(tabulapdf)
 library(here)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
